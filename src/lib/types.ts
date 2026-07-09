@@ -23,6 +23,18 @@ export interface EventRow {
   created_at: string;
 }
 
+// 홈 "내 참여 목록" 카드용 요약 (참여자로 등록된 이벤트 목록).
+export interface MyEventSummary {
+  id: string;
+  title: string;
+  module_type: ModuleType;
+  status: EventStatus;
+  created_at: string;
+  participant_count: number; // 참여자 수
+  vote_count: number; // 투표한 사람 수(중복 제거)
+  has_plan: boolean; // 추천안(plan) 생성 여부
+}
+
 // 후보 식당의 부가정보 (candidates.meta 에 jsonb 로 저장).
 export interface CandidateMeta {
   area?: string; // 위치/동네
