@@ -1,69 +1,97 @@
 "use client";
 
-// 갑자기 회식 - 설정 화면 (탭탭탭 선택지 UX)
-// 인원/예산/분위기를 고르고, 지역을 지정하면 Kakao로 식당을 추천받아 후보로 담습니다.
+// 갑자기 회식 설정 (D-01·D-02·D-03·D-04·D-05) — gapjagi.html 디자인 + 실제 Kakao 검색.
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { Button, Chip } from "@/components/ui";
+import Shell from "@/components/Shell";
 import StaticMap from "@/components/StaticMap";
 import MemberPicker from "@/features/org/MemberPicker";
 import { useCurrentUser } from "@/features/auth/useCurrentUser";
+import {
+  BUDGETS,
+  FOODS,
+  PEOPLE,
+  REGIONS,
+  VIBES,
+} from "@/features/event/dinnerOptions";
 import type { Participant, PlaceResult } from "@/lib/types";
-
-const BUDGETS = ["3만원 이하", "3~5만원", "5만원 이상"];
-const MOODS = [
-  "고깃집",
-  "술 한잔",
-  "조용한 곳",
-  "왁자지껄",
-  "분위기 좋은",
-  "가성비",
-  "회 / 해산물",
-  "이색적인",
+const COMMENT_TAGS = [
+  "룸 예약 확인",
+  "전화로 확인함",
+  "가성비 좋음",
+  "접근성 좋음",
+  "직접 가봄",
+  "분위기 굿",
 ];
 
-// 투표 후보. 검색으로 담은 경우 category/address/placeUrl 이 채워집니다.
-interface CandidateInput {
+// D-12 권역별 제휴(AD) 파트너 — 데모용 목업. 검색결과 맨 위에 '광고'로 1곳 노출.
+// (실서비스에선 광고 매칭 서버가 권역·메뉴로 파트너를 반환하는 자리)
+type AdPartner = {
+  emo: string;
   name: string;
-  note: string;
-  category?: string;
-  address?: string;
-  phone?: string;
-  placeUrl?: string;
-  lat?: number;
-  lng?: number;
+  category: string;
+  hook: string; // 제휴 혜택 한 줄
+  address: string;
+  placeUrl: string;
+  lat: number;
+  lng: number;
+};
+const AD_PARTNERS: Record<string, AdPartner> = {
+  "성수·왕십리": { emo: "🥩", name: "우대갈비 성수직영점", category: "고깃집 · 룸 완비", hook: "예약 시 음료 무한리필", address: "서울 성동구 성수동", placeUrl: "https://map.kakao.com/?q=우대갈비 성수", lat: 37.5445, lng: 127.0557 },
+  "강남·역삼": { emo: "🍖", name: "벽제갈비 역삼점", category: "고깃집 · 10인 룸", hook: "10인 룸 확정 예약 가능", address: "서울 강남구 역삼동", placeUrl: "https://map.kakao.com/?q=벽제갈비 역삼", lat: 37.5006, lng: 127.0364 },
+  "홍대·합정": { emo: "🔥", name: "연남토마 본점", category: "고깃집 · 단체석", hook: "단체 10% 할인", address: "서울 마포구 연남동", placeUrl: "https://map.kakao.com/?q=연남토마", lat: 37.5602, lng: 126.9255 },
+  "판교·정자": { emo: "🐷", name: "금돼지식당 판교점", category: "고깃집 · 주차", hook: "주차 2시간 무료", address: "경기 성남시 분당구", placeUrl: "https://map.kakao.com/?q=금돼지식당 판교", lat: 37.3948, lng: 127.1112 },
+};
+
+// 오늘 기준 7일 날짜 칩 (시간 제외, D-02)
+function useDateOptions() {
+  return useMemo(() => {
+    const wd = ["일", "월", "화", "수", "목", "금", "토"];
+    const now = new Date();
+    return Array.from({ length: 7 }, (_, i) => {
+      const dt = new Date(now);
+      dt.setDate(now.getDate() + i);
+      const label =
+        i === 0 ? "오늘" : i === 1 ? "내일" : `${dt.getMonth() + 1}/${dt.getDate()}(${wd[dt.getDay()]})`;
+      dt.setHours(19, 0, 0, 0); // 회식 기본 시간 19:00
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const iso = `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T19:00`;
+      return { label, iso };
+    });
+  }, []);
+}
+
+function parsePeople(p: string | null): number {
+  if (!p) return 6;
+  return parseInt(p, 10) || 6;
 }
 
 export default function CreateDinnerPage() {
   const router = useRouter();
-
-  const [title, setTitle] = useState("갑자기 회식");
-  const [headcount, setHeadcount] = useState(6);
-  const [budget, setBudget] = useState(BUDGETS[1]);
-  const [moods, setMoods] = useState<string[]>([]);
-  const [memo, setMemo] = useState("");
-  const [scheduledAt, setScheduledAt] = useState(""); // datetime-local 문자열
-
-  // 지역 검색
-  const [region, setRegion] = useState("");
-  const [searching, setSearching] = useState(false);
-  const [locating, setLocating] = useState(false);
-  const [places, setPlaces] = useState<PlaceResult[]>([]);
-  const [searchError, setSearchError] = useState("");
-  const [searched, setSearched] = useState(false);
-  const [byLocation, setByLocation] = useState(false); // 내 위치 기반 검색 여부
-
-  // 광고 파트너 (스폰서)
-  const [sponsored, setSponsored] = useState<(PlaceResult & { isAd?: boolean; description?: string })[]>([]);
-
-  const [candidates, setCandidates] = useState<CandidateInput[]>([]);
-  const [participants, setParticipants] = useState<Participant[]>([]);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
-
-  // 로그인한 주최자를 참여자에 기본 포함.
+  const dateOpts = useDateOptions();
   const { user } = useCurrentUser();
+
+  // 선택 항목 컨테이너 ref (0~5=칩 필드, 6=장소검색). 하나 고르면 다음 항목으로 스크롤.
+  const fieldRefs = useRef<Array<HTMLDivElement | null>>([]);
+  function pick<T>(setter: (v: T) => void, value: T, idx: number) {
+    setter(value);
+    // 렌더 후 다음 필드를 화면 중앙으로 부드럽게 이동 (없으면 아무 일도 안 함)
+    requestAnimationFrame(() => {
+      fieldRefs.current[idx + 1]?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
+  }
+
+  const [dateIdx, setDateIdx] = useState<number | null>(null);
+  const [region, setRegion] = useState<string | null>(null);
+  const [people, setPeople] = useState<string | null>(null);
+  const [budget, setBudget] = useState<string | null>(null);
+  const [food, setFood] = useState<string | null>(null);
+  const [vibe, setVibe] = useState<string | null>(null);
+
+  const [participants, setParticipants] = useState<Participant[]>([]);
   useEffect(() => {
     if (user?.account) {
       setParticipants((prev) =>
@@ -74,70 +102,76 @@ export default function CreateDinnerPage() {
     }
   }, [user]);
 
-  function toggleMood(m: string) {
-    setMoods((prev) =>
-      prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]
-    );
-  }
+  const [searching, setSearching] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [places, setPlaces] = useState<PlaceResult[]>([]);
+  const [searched, setSearched] = useState(false);
+  const [byLocation, setByLocation] = useState(false);
+  const [searchError, setSearchError] = useState("");
 
-  // 지역명 또는 좌표(coords)로 검색. coords 가 있으면 내 위치 기반.
+  // 선택된 후보(shortlist) + 후보별 메모 태그
+  const [picked, setPicked] = useState<PlaceResult[]>([]);
+  const [tags, setTags] = useState<Record<string, string[]>>({});
+  const [submitting, setSubmitting] = useState(false);
+
+  // 붙여넣기 매직 (①) — 단톡방 대화 → 자동 완성
+  const [magicText, setMagicText] = useState("");
+  const [magicBusy, setMagicBusy] = useState(false);
+  const [magicMsg, setMagicMsg] = useState("");
+  const [magicError, setMagicError] = useState("");
+
+  const conditionsDone =
+    [dateIdx, region, people, budget, food, vibe].filter(
+      (v) => v !== null
+    ).length;
+  const key = (p: PlaceResult) => p.placeUrl + p.name;
+
+  // D-12: 선택한 권역의 제휴 파트너(있으면). 검색결과 맨 위 광고 카드로 노출.
+  const adPartner = region ? AD_PARTNERS[region] : null;
+  const adPlace: PlaceResult | null = adPartner
+    ? {
+        name: adPartner.name,
+        category: adPartner.category,
+        address: adPartner.address,
+        phone: "",
+        placeUrl: adPartner.placeUrl,
+        lat: adPartner.lat,
+        lng: adPartner.lng,
+        distance: "",
+      }
+    : null;
+
   async function runSearch(coords?: { x: string; y: string }) {
     setSearchError("");
     setSearching(true);
     setSearched(true);
     setByLocation(Boolean(coords));
     try {
-      const params = new URLSearchParams({ moods: moods.join(",") });
+      const moods = [food, vibe].filter(Boolean).join(",");
+      const params = new URLSearchParams({ moods });
       if (coords) {
         params.set("x", coords.x);
         params.set("y", coords.y);
       } else {
-        params.set("region", region.trim());
+        params.set("region", region ?? "");
       }
-      // Kakao 검색 + 광고 파트너 병렬 조회
-      const [placesRes, adRes] = await Promise.all([
-        fetch(`/api/places?${params}`),
-        fetch(`/api/ad/sponsored?module_type=dinner&region=${encodeURIComponent(region.trim())}`),
-      ]);
-      const placesData = await placesRes.json();
-      if (!placesRes.ok) throw new Error(placesData.error ?? "검색 실패");
-      setPlaces(placesData.places ?? []);
-
-      const adData = await adRes.json().catch(() => ({ places: [] }));
-      const ads = adData.places ?? [];
-      setSponsored(ads);
-      // 광고 노출 추적
-      for (const ad of ads) {
-        fetch("/api/ad/track", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ partner_name: ad.name, event_type: "impression", module_type: "dinner", region: region.trim() }),
-        }).catch(() => {});
-      }
+      const res = await fetch(`/api/places?${params}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "검색 실패");
+      setPlaces(data.places ?? []);
     } catch (e) {
-      setSearchError(e instanceof Error ? e.message : "검색에 실패했습니다.");
+      setSearchError(e instanceof Error ? e.message : "검색에 실패했어요.");
       setPlaces([]);
-      setSponsored([]);
     } finally {
       setSearching(false);
     }
   }
 
-  function searchByRegion() {
-    if (!region.trim()) {
-      setSearchError("지역을 입력하거나 아래 '내 위치로 찾기'를 눌러주세요.");
-      return;
-    }
-    runSearch();
-  }
-
-  // 브라우저 위치 권한 → 좌표 → 주변 식당 검색
   function searchByLocation() {
     if (!("geolocation" in navigator)) {
       setSearchError("이 브라우저는 위치 기능을 지원하지 않아요.");
       return;
     }
-    setSearchError("");
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -147,453 +181,413 @@ export default function CreateDinnerPage() {
           y: String(pos.coords.latitude),
         });
       },
-      (err) => {
+      () => {
         setLocating(false);
-        setSearchError(
-          err.code === err.PERMISSION_DENIED
-            ? "위치 권한이 거부됐어요. 지역명으로 검색해주세요."
-            : "위치를 가져오지 못했어요. 지역명으로 검색해주세요."
-        );
+        setSearchError("위치를 가져오지 못했어요. 권역을 골라 검색해주세요.");
       },
       { enableHighAccuracy: true, timeout: 8000 }
     );
   }
 
-  function isPicked(p: PlaceResult) {
-    return candidates.some((c) => c.placeUrl === p.placeUrl && c.name === p.name);
-  }
-
   function togglePick(p: PlaceResult) {
-    setCandidates((prev) => {
-      const exists = prev.some(
-        (c) => c.placeUrl === p.placeUrl && c.name === p.name
-      );
-      if (exists) {
-        return prev.filter(
-          (c) => !(c.placeUrl === p.placeUrl && c.name === p.name)
-        );
-      }
-      return [
+    setPicked((prev) =>
+      prev.some((x) => key(x) === key(p))
+        ? prev.filter((x) => key(x) !== key(p))
+        : [...prev, p]
+    );
+  }
+  function toggleTag(p: PlaceResult, tag: string) {
+    const k = key(p);
+    setTags((prev) => {
+      const arr = prev[k] ?? [];
+      return {
         ...prev,
-        {
-          name: p.name,
-          note: p.category,
-          category: p.category,
-          address: p.address,
-          phone: p.phone,
-          placeUrl: p.placeUrl,
-          lat: p.lat,
-          lng: p.lng,
-        },
-      ];
+        [k]: arr.includes(tag) ? arr.filter((t) => t !== tag) : [...arr, tag],
+      };
     });
   }
 
-  function addManual() {
-    setCandidates((prev) => [...prev, { name: "", note: "" }]);
-  }
-
-  function updateManual(i: number, patch: Partial<CandidateInput>) {
-    setCandidates((prev) =>
-      prev.map((c, idx) => (idx === i ? { ...c, ...patch } : c))
+  // 후보 카드 한 장 렌더 (실제 검색결과 + 제휴 광고 공용).
+  // isAd=true 면 썸네일 대신 이모지, 'AD · 제휴' 배지 + 혜택 문구를 붙인다.
+  function placeCard(p: PlaceResult, ad?: AdPartner) {
+    const isAd = Boolean(ad);
+    const on = picked.some((x) => key(x) === key(p));
+    const ptags = tags[key(p)] ?? [];
+    return (
+      <div key={key(p)} className={`cand${on ? " picked" : ""}${isAd ? " ad" : ""}`}>
+        <div className="row1" style={{ cursor: "pointer" }} onClick={() => togglePick(p)}>
+          <div className={`selbox${on ? " on" : ""}`}>{on ? "✓" : ""}</div>
+          {isAd ? (
+            <div className="ph">{ad!.emo}</div>
+          ) : (
+            <StaticMap lat={p.lat} lng={p.lng} size={46} className="rounded-[11px] shrink-0" />
+          )}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {isAd && <span className="adbadge">AD · 제휴</span>}
+            <h4 style={isAd ? { marginTop: 6 } : undefined}>{p.name}</h4>
+            <div className="info">
+              <span>{p.category}</span>
+              {p.distance && <span>{p.distance}m</span>}
+            </div>
+          </div>
+        </div>
+        {isAd && <div className="adhook">🎁 {ad!.hook}</div>}
+        <a
+          href={p.placeUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ fontSize: 12.5, fontWeight: 700, color: "var(--coral-d)", display: "inline-block", marginTop: 9 }}
+        >
+          🗺 지도·리뷰 ›
+        </a>
+        {on && (
+          <div className="tagwrap">
+            <div className="taglabel">메모 남기기 (선택 · 투표 시 함께 보여요)</div>
+            <div className="chips">
+              {COMMENT_TAGS.map((t) => (
+                <button
+                  key={t}
+                  className={`chip sm${ptags.includes(t) ? " on" : ""}`}
+                  onClick={() => toggleTag(p, t)}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     );
   }
 
-  function removeCandidate(i: number) {
-    setCandidates((prev) => prev.filter((_, idx) => idx !== i));
-  }
-
-  const validCandidates = candidates.filter((c) => c.name.trim());
-
-  async function handleSubmit() {
-    setError("");
-    if (validCandidates.length < 2) {
-      setError("후보를 2개 이상 담아주세요.");
-      return;
-    }
+  async function submit() {
+    if (picked.length === 0) return;
     setSubmitting(true);
     try {
       const res = await fetch("/api/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: title.trim() || "갑자기 회식",
-          config: { headcount, budget, moods, memo: memo.trim(), scheduledAt },
+          title: `갑자기 회식${region ? ` · ${region}` : ""}`,
+          config: {
+            headcount: parsePeople(people),
+            budget: budget ?? "3만원대",
+            moods: [food, vibe].filter(Boolean),
+            memo: "",
+            scheduledAt: dateIdx !== null ? dateOpts[dateIdx].iso : "",
+            region: region ?? undefined,
+          },
           participants,
-          candidates: validCandidates.map((c) => ({
-            name: c.name.trim(),
+          candidates: picked.map((p) => ({
+            name: p.name,
             meta: {
-              note: c.note?.trim() ?? "",
-              category: c.category,
-              address: c.address,
-              phone: c.phone,
-              placeUrl: c.placeUrl,
-              lat: c.lat,
-              lng: c.lng,
-              area: region.trim() || undefined,
+              category: p.category,
+              address: p.address,
+              phone: p.phone,
+              placeUrl: p.placeUrl,
+              lat: p.lat,
+              lng: p.lng,
+              area: region ?? undefined,
+              tags: tags[key(p)] ?? [],
             },
           })),
         }),
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "생성에 실패했습니다.");
-      }
+      if (!res.ok) throw new Error();
       const { eventId } = await res.json();
-      router.push(`/e/${eventId}`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "생성에 실패했습니다.");
+      // D-04: 1곳이면 바로 확정(추천안으로), 2곳+ 이면 팀 투표
+      router.push(picked.length === 1 ? `/e/${eventId}/plan` : `/e/${eventId}`);
+    } catch {
       setSubmitting(false);
     }
   }
 
+  // 붙여넣기 매직: 파싱 → 칩 채우기 → Kakao 검색 → 후보 3곳 자동 담기 → 투표 생성
+  async function magicFill() {
+    const text = magicText.trim();
+    if (!text || magicBusy) return;
+    setMagicError("");
+    setMagicBusy(true);
+    try {
+      setMagicMsg("대화를 읽는 중…");
+      const dates = dateOpts.map((d) => d.label);
+      const pr = await fetch("/api/parse-dinner", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, dates }),
+      });
+      if (!pr.ok) throw new Error("대화 분석에 실패했어요.");
+      const { parsed } = await pr.json();
+
+      // 빈 곳은 기본값으로 채워 데모가 끝까지 흐르게 함
+      const eff = {
+        region: (parsed.region as string) ?? "강남·역삼",
+        food: (parsed.food as string) ?? "고기",
+        people: (parsed.people as string) ?? "8명",
+        budget: (parsed.budget as string) ?? "3만원대",
+        vibe: parsed.vibe as string | null,
+      };
+      // 화면에 채워지는 게 보이도록 상태 반영
+      if (parsed.dateOffset != null) setDateIdx(parsed.dateOffset);
+      setRegion(eff.region);
+      setFood(eff.food);
+      setPeople(eff.people);
+      setBudget(eff.budget);
+      if (eff.vibe) setVibe(eff.vibe);
+
+      setMagicMsg(`${eff.region} · ${eff.food} 맛집 찾는 중…`);
+      const moods = [eff.food, eff.vibe].filter(Boolean).join(",");
+      const sr = await fetch(
+        `/api/places?${new URLSearchParams({ region: eff.region, moods })}`
+      );
+      const sdata = await sr.json();
+      const found: PlaceResult[] = sdata.places ?? [];
+      setSearched(true);
+      setByLocation(false);
+      setSearchError("");
+      setPlaces(found);
+
+      if (found.length < 2) {
+        setMagicMsg("");
+        setMagicError("맛집이 충분히 안 나왔어요. 아래에서 직접 골라주세요.");
+        return;
+      }
+      const picks = found.slice(0, 3);
+      setPicked(picks);
+
+      setMagicMsg("투표 링크 만드는 중…");
+      const cr = await fetch("/api/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: `갑자기 회식 · ${eff.region}`,
+          config: {
+            headcount: parsePeople(eff.people),
+            budget: eff.budget,
+            moods: [eff.food, eff.vibe].filter(Boolean),
+            memo: (parsed.memo as string) ?? "",
+            scheduledAt:
+              parsed.dateOffset != null ? dateOpts[parsed.dateOffset].iso : "",
+            region: eff.region,
+          },
+          participants,
+          candidates: picks.map((p) => ({
+            name: p.name,
+            meta: {
+              category: p.category,
+              address: p.address,
+              phone: p.phone,
+              placeUrl: p.placeUrl,
+              lat: p.lat,
+              lng: p.lng,
+              area: eff.region,
+              tags: [],
+            },
+          })),
+        }),
+      });
+      if (!cr.ok) throw new Error("투표 생성에 실패했어요.");
+      const { eventId } = await cr.json();
+      router.push(`/e/${eventId}`);
+    } catch (e) {
+      setMagicMsg("");
+      setMagicError(e instanceof Error ? e.message : "자동 완성에 실패했어요.");
+      setMagicBusy(false);
+    }
+  }
+
+  const cta =
+    picked.length === 0 ? (
+      <button className="cta" disabled>
+        {searched ? "장소를 골라주세요" : "조건 고르고 맛집 검색"}
+      </button>
+    ) : picked.length === 1 ? (
+      <button className="cta" onClick={submit} disabled={submitting}>
+        {submitting ? "만드는 중…" : "이 곳으로 확정"}
+      </button>
+    ) : (
+      <button className="cta mint" onClick={submit} disabled={submitting}>
+        {submitting ? "만드는 중…" : `🗳️ 팀 투표 붙이기 (${picked.length}곳)`}
+      </button>
+    );
+
   return (
-    <main className="screen px-5 pb-28">
-      <header className="flex items-center gap-3 pt-6 pb-4">
-        <Link href="/" className="text-2xl text-stone-400">
-          ‹
-        </Link>
-        <h1 className="text-lg font-bold">🍻 갑자기 회식</h1>
-      </header>
-
-      <Field label="회식 이름">
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="예: 팀 번개 회식"
-          className="w-full rounded-xl bg-white px-4 py-3 text-[15px] ring-1 ring-stone-200 outline-none focus:ring-orange-400"
-        />
-      </Field>
-
-      <Field label="몇 명이 모이나요?">
-        <div className="flex items-center gap-4">
-          <Stepper
-            value={headcount}
-            onChange={(v) => setHeadcount(Math.max(2, Math.min(50, v)))}
-          />
-          <span className="text-sm text-stone-500">명</span>
-        </div>
-      </Field>
-
-      <Field label="1인 예산대">
-        <div className="flex flex-wrap gap-2">
-          {BUDGETS.map((b) => (
-            <Chip key={b} selected={budget === b} onClick={() => setBudget(b)}>
-              {b}
-            </Chip>
-          ))}
-        </div>
-      </Field>
-
-      <Field label="회식 날짜·시간 (선택 — 캘린더 등록에 사용)">
-        <input
-          type="datetime-local"
-          value={scheduledAt}
-          onChange={(e) => setScheduledAt(e.target.value)}
-          className="w-full rounded-xl bg-white px-4 py-3 text-[15px] ring-1 ring-stone-200 outline-none focus:ring-orange-400"
-        />
-      </Field>
-
-      <Field label={`참여자 (${participants.length}명) — 조직도에서 추가`}>
-        <MemberPicker value={participants} onChange={setParticipants} />
-        <p className="mt-1.5 px-1 text-xs text-stone-400">
-          여기서 지정하거나, 발급된 링크로 팀원이 직접 참여할 수 있어요.
+    <Shell steps={["선택", "의논", "완성"]} activeStep={0} cta={cta}>
+      {/* ✨ 붙여넣기 매직 — 단톡방 대화 붙여넣으면 자동 완성 */}
+      <div className="cardbox" style={{ borderColor: "var(--coral)", background: "#FFF6F2" }}>
+        <h3>✨ 붙여넣기 매직</h3>
+        <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.6, margin: "4px 0 10px" }}>
+          단톡방 대화를 그대로 붙여넣으면 인원·메뉴·날짜·권역을 알아서 채우고 투표 링크까지 만들어요.
         </p>
-      </Field>
-
-      <Field label="분위기 (여러 개 선택 가능)">
-        <div className="flex flex-wrap gap-2">
-          {MOODS.map((m) => (
-            <Chip
-              key={m}
-              selected={moods.includes(m)}
-              onClick={() => toggleMood(m)}
-            >
-              {m}
-            </Chip>
-          ))}
-        </div>
-      </Field>
-
-      {/* 지역 검색 */}
-      <Field label="어느 지역에서 볼까요?">
-        <div className="flex gap-2">
-          <input
-            value={region}
-            onChange={(e) => setRegion(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && searchByRegion()}
-            placeholder="예: 강남역, 연남동, 판교"
-            className="min-w-0 flex-1 rounded-xl bg-white px-4 py-3 text-[15px] ring-1 ring-stone-200 outline-none focus:ring-orange-400"
-          />
-          <button
-            onClick={searchByRegion}
-            disabled={searching || locating}
-            className="shrink-0 rounded-xl bg-stone-800 px-4 text-sm font-semibold text-white active:scale-95 disabled:opacity-50"
-          >
-            {searching && !byLocation ? "검색중" : "맛집 검색"}
-          </button>
-        </div>
-
-        <button
-          onClick={searchByLocation}
-          disabled={searching || locating}
-          className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl bg-orange-50 py-3 text-sm font-semibold text-orange-600 ring-1 ring-orange-200 active:scale-[0.99] disabled:opacity-50"
-        >
-          {locating ? "위치 확인 중…" : "📍 내 위치로 주변 맛집 찾기"}
-        </button>
-
-        {searchError && (
-          <p className="mt-2 text-sm font-medium text-red-500">{searchError}</p>
-        )}
-      </Field>
-
-      {/* 검색 결과 */}
-      {searched && !searchError && (
-        <div className="mt-3 flex flex-col gap-2">
-          <p className="px-1 text-xs text-stone-400">
-            {searching
-              ? "카카오에서 찾는 중…"
-              : `${byLocation ? "📍 내 주변 " : ""}${places.length}곳 찾았어요 · 후보로 담을 곳을 탭하세요`}
-          </p>
-
-          {/* 광고 파트너 (상단 노출) */}
-          {sponsored.map((sp) => {
-            const asPr: PlaceResult = { name: sp.name, category: sp.category, address: sp.address, phone: sp.phone, placeUrl: sp.placeUrl, lat: sp.lat, lng: sp.lng };
-            const picked = isPicked(asPr);
-            function trackClick() {
-              fetch("/api/ad/track", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ partner_name: sp.name, event_type: "click", module_type: "dinner", region: region.trim() }),
-              }).catch(() => {});
-            }
-            return (
-              <div
-                key={`ad-${sp.name}`}
-                className={`cand ad rounded-2xl p-3.5 ring-1 transition ${picked ? "ring-orange-300" : ""}`}
-              >
-                <div className="flex items-start gap-3">
-                  {sp.lat && sp.lng ? (
-                    <a href={sp.placeUrl || "#"} target="_blank" rel="noopener noreferrer" onClick={trackClick} className="shrink-0 overflow-hidden rounded-lg ring-1 ring-stone-200">
-                      <StaticMap lat={sp.lat} lng={sp.lng} size={72} />
-                    </a>
-                  ) : (
-                    <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-lg bg-amber-50 text-2xl">🏪</div>
-                  )}
-                  <button onClick={() => { trackClick(); togglePick(asPr); }} className="min-w-0 flex-1 text-left">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="adbadge">AD · 제휴</span>
-                      <span className="font-bold text-stone-800">{sp.name}</span>
-                    </div>
-                    {(sp as { description?: string }).description && (
-                      <div className="adhook">{(sp as { description?: string }).description}</div>
-                    )}
-                    {sp.address && (
-                      <div className="mt-1 text-[13px] text-stone-500">📍 {sp.address}</div>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => togglePick(asPr)}
-                    className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-bold ${picked ? "bg-orange-500 text-white" : "bg-stone-100 text-stone-600"}`}
-                  >
-                    {picked ? "담김 ✓" : "담기"}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-
-          {sponsored.length > 0 && places.length > 0 && (
-            <p className="addisclosure">광고 · 제휴는 항상 표시되며, 투표·선택은 팀 자유입니다.</p>
-          )}
-
-          {places.map((p) => {
-            const picked = isPicked(p);
-            return (
-              <div
-                key={p.placeUrl + p.name}
-                className={`rounded-2xl p-3.5 ring-1 transition ${
-                  picked
-                    ? "bg-orange-50 ring-orange-300"
-                    : "bg-white ring-stone-200"
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <a
-                    href={p.placeUrl || "#"}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="shrink-0 overflow-hidden rounded-lg ring-1 ring-stone-200"
-                    title="카카오맵에서 보기"
-                  >
-                    <StaticMap lat={p.lat} lng={p.lng} size={72} />
-                  </a>
-                  <button
-                    onClick={() => togglePick(p)}
-                    className="min-w-0 flex-1 text-left"
-                  >
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="font-bold text-stone-800">{p.name}</span>
-                      <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] text-stone-500">
-                        {p.category}
-                      </span>
-                      {p.distance && (
-                        <span className="text-[11px] text-stone-400">
-                          {p.distance}m
-                        </span>
-                      )}
-                    </div>
-                    {p.address && (
-                      <div className="mt-1 text-[13px] text-stone-500">
-                        📍 {p.address}
-                      </div>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => togglePick(p)}
-                    className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-bold ${
-                      picked
-                        ? "bg-orange-500 text-white"
-                        : "bg-stone-100 text-stone-600"
-                    }`}
-                  >
-                    {picked ? "담김 ✓" : "담기"}
-                  </button>
-                </div>
-                {p.placeUrl && (
-                  <div className="mt-2 flex gap-2">
-                    <a
-                      href={p.placeUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="rounded-lg bg-stone-100 px-3 py-1.5 text-[12px] font-semibold text-stone-600 active:scale-95"
-                    >
-                      🗺 지도
-                    </a>
-                    <a
-                      href={p.placeUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="rounded-lg bg-stone-100 px-3 py-1.5 text-[12px] font-semibold text-stone-600 active:scale-95"
-                    >
-                      ⭐ 리뷰
-                    </a>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* 담긴 후보 */}
-      <Field label={`투표 후보 (${validCandidates.length}개)`}>
-        <div className="flex flex-col gap-2">
-          {candidates.length === 0 && (
-            <p className="rounded-xl bg-stone-50 px-4 py-6 text-center text-sm text-stone-400">
-              위에서 지역을 검색해 담거나, 직접 추가하세요.
-            </p>
-          )}
-          {candidates.map((c, i) => (
-            <div key={i} className="rounded-xl bg-white p-3 ring-1 ring-stone-200">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-orange-500">
-                  {i + 1}
-                </span>
-                <input
-                  value={c.name}
-                  onChange={(e) => updateManual(i, { name: e.target.value })}
-                  placeholder="식당 이름"
-                  className="min-w-0 flex-1 bg-transparent text-[15px] font-medium outline-none"
-                />
-                <button
-                  onClick={() => removeCandidate(i)}
-                  className="text-stone-300 hover:text-stone-500"
-                  aria-label="후보 삭제"
-                >
-                  ✕
-                </button>
-              </div>
-              {(c.address || c.note) && (
-                <div className="mt-1 pl-5 text-[13px] text-stone-500">
-                  {c.address ? `📍 ${c.address}` : c.note}
-                </div>
-              )}
-            </div>
-          ))}
-          <button
-            onClick={addManual}
-            className="rounded-xl border border-dashed border-stone-300 py-3 text-sm font-medium text-stone-500 hover:border-orange-300 hover:text-orange-500"
-          >
-            + 직접 추가
-          </button>
-        </div>
-      </Field>
-
-      <Field label="팀원에게 한마디 (선택)">
         <textarea
-          value={memo}
-          onChange={(e) => setMemo(e.target.value)}
-          placeholder="예: 금요일 저녁 7시쯤 생각 중이에요!"
-          rows={2}
-          className="w-full resize-none rounded-xl bg-white px-4 py-3 text-[15px] ring-1 ring-stone-200 outline-none focus:ring-orange-400"
+          className="tinput"
+          style={{ minHeight: 82, resize: "vertical", fontFamily: "inherit" }}
+          value={magicText}
+          onChange={(e) => setMagicText(e.target.value)}
+          placeholder={'예: "오늘 저녁 회식할까? 10명 정도, 강남에서 고기 어때. 조용한 룸으로"'}
+          disabled={magicBusy}
         />
-      </Field>
-
-      {error && <p className="mt-2 text-sm font-medium text-red-500">{error}</p>}
-
-      <div className="fixed inset-x-0 bottom-0 mx-auto max-w-md border-t border-stone-200/70 bg-background/95 p-4 backdrop-blur">
-        <Button onClick={handleSubmit} disabled={submitting}>
-          {submitting
-            ? "만드는 중…"
-            : `투표 링크 만들기 (후보 ${validCandidates.length}개)`}
-        </Button>
+        <button
+          className="cta"
+          style={{ marginTop: 10, fontSize: 15, padding: 13 }}
+          onClick={magicFill}
+          disabled={!magicText.trim() || magicBusy}
+        >
+          {magicBusy ? magicMsg || "채우는 중…" : "✨ 붙여넣고 자동 완성"}
+        </button>
+        {magicError && (
+          <p style={{ color: "var(--coral-d)", fontSize: 13, marginTop: 8, fontWeight: 600 }}>
+            {magicError}
+          </p>
+        )}
       </div>
-    </main>
+
+      <p className="helper" style={{ textAlign: "center", margin: "18px 0 6px" }}>
+        또는 아래에서 직접 골라보세요 ↓
+      </p>
+
+      <div className="qline">
+        <span className="dot" />
+        {conditionsDone < 6
+          ? `아직 ${6 - conditionsDone}개 남았어요`
+          : "조건 완성! 맛집 검색해요"}
+      </div>
+      <h1 className="title" style={{ fontSize: 23 }}>
+        회식 조건을
+        <br />
+        탭탭탭 골라주세요
+      </h1>
+
+      <ChipField label="날짜" fieldRef={(el) => { fieldRefs.current[0] = el; }}>
+        {dateOpts.map((d, i) => (
+          <Chip key={d.label} on={dateIdx === i} onClick={() => pick(setDateIdx, i, 0)}>
+            {d.label}
+          </Chip>
+        ))}
+      </ChipField>
+      <ChipField label="지역 권역" fieldRef={(el) => { fieldRefs.current[1] = el; }}>
+        {REGIONS.map((r) => (
+          <Chip key={r} on={region === r} onClick={() => pick(setRegion, r, 1)}>
+            {r}
+          </Chip>
+        ))}
+      </ChipField>
+      <ChipField label="인원" fieldRef={(el) => { fieldRefs.current[2] = el; }}>
+        {PEOPLE.map((p) => (
+          <Chip key={p} on={people === p} onClick={() => pick(setPeople, p, 2)}>
+            {p}
+          </Chip>
+        ))}
+      </ChipField>
+      <ChipField label="예산 (1인)" fieldRef={(el) => { fieldRefs.current[3] = el; }}>
+        {BUDGETS.map((b) => (
+          <Chip key={b} on={budget === b} onClick={() => pick(setBudget, b, 3)}>
+            {b}
+          </Chip>
+        ))}
+      </ChipField>
+      <ChipField label="메뉴" fieldRef={(el) => { fieldRefs.current[4] = el; }}>
+        {FOODS.map((f) => (
+          <Chip key={f} on={food === f} onClick={() => pick(setFood, f, 4)}>
+            {f}
+          </Chip>
+        ))}
+      </ChipField>
+      <ChipField label="분위기" fieldRef={(el) => { fieldRefs.current[5] = el; }}>
+        {VIBES.map((v) => (
+          <Chip key={v} on={vibe === v} onClick={() => pick(setVibe, v, 5)}>
+            {v}
+          </Chip>
+        ))}
+      </ChipField>
+
+      <div className="field">
+        <label>참여자 ({participants.length}명)</label>
+        <MemberPicker value={participants} onChange={setParticipants} />
+      </div>
+
+      {/* 장소 검색 (D-03) — 분위기(idx 5) 선택 후 이 지점으로 스크롤 */}
+      <div className="field" ref={(el) => { fieldRefs.current[6] = el; }}>
+        <label>장소 추천받기</label>
+        <button
+          className="cta"
+          style={{ fontSize: 15, padding: 14 }}
+          onClick={() => runSearch()}
+          disabled={!region || !food || searching || locating}
+        >
+          {searching && !byLocation
+            ? "카카오에서 찾는 중…"
+            : region && food
+              ? `${region} · ${food} 맛집 검색`
+              : "권역·메뉴를 먼저 골라주세요"}
+        </button>
+        <button
+          className="cta ghost"
+          style={{ fontSize: 14, padding: 13, marginTop: 8 }}
+          onClick={searchByLocation}
+          disabled={searching || locating || !food}
+        >
+          {locating ? "위치 확인 중…" : "📍 내 위치로 주변 맛집"}
+        </button>
+        {searchError && (
+          <p style={{ color: "var(--coral-d)", fontSize: 13, marginTop: 8, fontWeight: 600 }}>
+            {searchError}
+          </p>
+        )}
+      </div>
+
+      {/* 검색 결과 (D-04 선택 · D-05 메모태그 · D-12 제휴 광고) */}
+      {searched && !searchError && (
+        <>
+          <div className="livebar">
+            <span>선택 {picked.length}곳</span>
+            <span style={{ marginLeft: "auto" }}>
+              {searching ? "찾는 중…" : "탭해서 담기"}
+            </span>
+          </div>
+          {/* 권역 제휴 파트너 광고 (맨 위 1곳) */}
+          {adPlace && adPartner && placeCard(adPlace, adPartner)}
+          {places.map((p) => placeCard(p))}
+          {adPlace && adPartner && (
+            <div className="addisclosure">
+              &lsquo;AD · 제휴&rsquo; 식당은 {region}권 광고 파트너입니다 (룸·단체 예약 정보 제공)
+            </div>
+          )}
+        </>
+      )}
+    </Shell>
   );
 }
 
-function Field({
+function ChipField({
   label,
   children,
+  fieldRef,
 }: {
   label: string;
   children: React.ReactNode;
+  fieldRef?: (el: HTMLDivElement | null) => void;
 }) {
   return (
-    <div className="mt-6">
-      <label className="mb-2 block px-1 text-sm font-semibold text-stone-600">
-        {label}
-      </label>
-      {children}
+    <div className="field" ref={fieldRef}>
+      <label>{label}</label>
+      <div className="chips">{children}</div>
     </div>
   );
 }
 
-function Stepper({
-  value,
-  onChange,
+function Chip({
+  on,
+  onClick,
+  children,
 }: {
-  value: number;
-  onChange: (v: number) => void;
+  on: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-3">
-      <button
-        onClick={() => onChange(value - 1)}
-        className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-xl font-bold text-stone-600 ring-1 ring-stone-200 active:scale-95"
-      >
-        −
-      </button>
-      <span className="w-10 text-center text-2xl font-extrabold tabular-nums">
-        {value}
-      </span>
-      <button
-        onClick={() => onChange(value + 1)}
-        className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-xl font-bold text-stone-600 ring-1 ring-stone-200 active:scale-95"
-      >
-        +
-      </button>
-    </div>
+    <button className={`chip${on ? " on" : ""}`} onClick={onClick}>
+      {children}
+    </button>
   );
 }

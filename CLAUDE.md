@@ -20,10 +20,13 @@
 
 ## 2. 현재 상태 (한눈에)
 
-**MVP = 갑자기 회식 모듈. 전체 흐름 완성 + E2E 검증 완료.**
+**MVP = 회식 + 회의 모듈. 두 흐름 모두 완성 + E2E 검증 + Vercel 배포 완료.**
+(라이브: https://gapjagi.vercel.app · 배포 방법은 §3-1)
 
 완성됨:
 - 랜딩 → 회식 설정(선택지 UX) → 투표지 → 결과(폴링) → 추천안(Groq) → 공유 HTML
+- **회의 모듈(M-01~14)**: 가능시간 그리드 → 폴링 취합 → 히트맵·최적시간 → 원탭 갈등해결(blocker 빼고 확정/전원되는 시간) → 확정(회의실·준비물·알림·공지, 회의실/알림은 목업). 라우트 `/create/meeting`·`/m/[id]{,/result,/confirm}`, `/api/meetings/*`, `availability` 테이블
+- 홈 "내 참여 목록"(로그인 사용자가 참여한 이벤트 갤러리) · D-06 OG 미리보기 · D-12 권역 제휴 광고(목업) · 설정 화면 선택 시 자동 스크롤
 - 지역/📍내 위치 기반 Kakao 식당 추천 (리뷰 링크·지도 포함)
 - 구글 캘린더 등록 + .ics 저장
 - 추천 식당 위치 지도(OpenStreetMap)
@@ -32,9 +35,9 @@
 - 사용자 보이는 곳 프로필 사진 표시 / 도메인별 폴더 구조(`src/features/*`)
 
 미완 (남은 일):
-- [ ] 팀 문구/시안 반영 (리스킨 — §9 참고)
 - [ ] 여행 / 워크샵 모듈 확장 (`module_type` 재사용)
-- [ ] 데모 리허설 / 샘플 데이터 정리
+- [ ] 회의 모듈 추가 흐름(선택): 시간 제안→각자 OK 라운드, 일정 변경(재확인) — 현재는 "바로 확정" 경로만
+- [ ] 데모 리허설 / 샘플·테스트 데이터 정리 (라이브 DB에 테스트 회의 몇 건 있음)
 
 ---
 
@@ -51,8 +54,45 @@ npm run db:setup                 # = psql -d gapjagi -f db/schema.sql (테이블
 npm run dev                      # http://localhost:3000
 ```
 
-- **로컬 전용**: 이 기기(localhost)에서만 구동. 배포/외부공개 없음.
+- **로컬 개발**: 이 기기(localhost)에서 구동. 팀 공유용으로 Vercel에 배포됨(아래 §3-1).
 - 모바일 화면 확인: 브라우저 개발자도구(⌥⌘I) → 기기 모드.
+
+### 3-1. 배포 (Vercel + Neon) — 팀원 공유용
+
+**라이브 URL: https://gapjagi.vercel.app** (Vercel CLI 로 배포. 팀원에게 이 링크만 공유하면 됨)
+
+구성: **앱 = Vercel(무료 Hobby)** / **DB = Neon(무료 Postgres)**. 둘 다 무료 티어. GitHub push 자동배포는 미설정 상태라, 재배포는 아래 CLI 로 수동 실행.
+
+```bash
+# (최초 1회) Vercel 로그인 — 브라우저 인증. 현재 계정: sulki0309-6269
+npx vercel login
+
+# (최초 1회) 프로젝트 연결 — .vercel/project.json 생성 (projectName: gapjagi)
+npx vercel link --yes --project gapjagi
+
+# (최초 1회) Neon DB 준비: neon.tech 에서 프로젝트 생성 → 접속문자열 받기
+#   스키마 로드 (로컬 psql 로 Neon 에 직접):
+psql "postgresql://<neon-접속문자열>?sslmode=require" -f db/schema.sql
+#   멤버는 배포 후 첫 /api/org/members 호출 시 샘플 8명 자동 시딩됨.
+
+# (최초 1회) 환경변수 3개를 production 에 등록 (값은 .env.local 에서 복사)
+printf '%s' "<Neon POOLED 접속문자열>"    | npx vercel env add DATABASE_URL production
+printf '%s' "$GROQ_API_KEY"               | npx vercel env add GROQ_API_KEY production
+printf '%s' "$KAKAO_REST_API_KEY"         | npx vercel env add KAKAO_REST_API_KEY production
+#   ⚠️ OFFICENEXT_* 는 등록하지 않는다 → 실 직원 대신 샘플 8명으로 폴백(개인정보 노출 0).
+
+# 배포 (코드 수정 후 매번 이 한 줄) — 로컬 디렉터리를 업로드해 Vercel 에서 빌드
+npx vercel --prod --yes
+```
+
+배포 시 반드시 지켜야 할 포인트:
+- **DB SSL**: `src/lib/db.ts` 는 접속문자열이 localhost 가 아니면 SSL 을 자동으로 켠다(Neon 필수). 이 처리가 없으면 클라우드 DB 연결이 거부됨.
+- **Neon 은 POOLED 접속문자열**(호스트에 `-pooler` 포함)을 `DATABASE_URL` 로 쓴다 — 서버리스 연결 수 절약.
+- **동기화 타임아웃 회피**: 조직도 1082명 실동기화는 10~20초라 Vercel 서버리스 함수 시간제한을 넘길 수 있음. 그래서 배포판은 `OFFICENEXT_*` 를 비워 **샘플 8명**만 쓴다. (실 직원 데이터가 필요하면 로컬에서 `db/seed-members.sql` 을 Neon 에 직접 import — 단 실명·사진이라 **public repo 커밋 금지**, `.gitignore` 처리됨.)
+- **Kakao 도메인 등록 불필요**: 식당 검색은 서버(API Route)에서 REST 키로 호출하므로 JS 키용 도메인 제한을 받지 않는다. (클라이언트 JS 키였다면 배포 도메인 등록 필요.)
+- **빌드 주의**: `useSearchParams()` 는 반드시 `<Suspense>` 로 감싼다(프로덕션 빌드 프리렌더에서 강제. 로컬 dev 는 안 걸림).
+- **샘플 로그인 계정**(비밀번호 없음, 아이디만 입력): `hong@jiran.com`·`kim@jiran.com`·`lee@jiran.com`·`park@jiran.com`·`choi@jiran.com`·`jung@jiran.com`·`kang@jiran.com`·`yoon@jiran.com`. 게스트 닉네임도 가능.
+- **공개 노출 주의**: 배포 앱은 URL 만 알면 누구나 접속 가능(인증계층 없음). 그래서 개인정보는 샘플만. 저장소는 아직 PUBLIC. 데모 후 Neon 비밀번호·Groq·Kakao 키 **rotate 권장**.
 
 ---
 

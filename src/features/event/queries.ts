@@ -6,6 +6,7 @@ import type {
   DinnerConfig,
   EventRow,
   ModuleType,
+  MyEventSummary,
   Participant,
   PlanContent,
   PlanRow,
@@ -69,6 +70,23 @@ export async function getParticipants(
   );
 }
 
+// 내가 참여자로 등록된 이벤트 목록 (홈 "내 참여 목록"). 생성자·링크 합류 모두 포함.
+export async function listEventsByAccount(
+  account: string
+): Promise<MyEventSummary[]> {
+  return query<MyEventSummary>(
+    `select e.id, e.title, e.module_type, e.status, e.created_at,
+       (select count(*) from participants p2 where p2.event_id = e.id)::int as participant_count,
+       (select count(distinct voter_name) from votes v where v.event_id = e.id)::int as vote_count,
+       exists(select 1 from plans pl where pl.event_id = e.id) as has_plan
+     from events e
+     join participants p on p.event_id = e.id
+     where p.account = $1
+     order by e.created_at desc`,
+    [account]
+  );
+}
+
 export async function getEvent(eventId: string): Promise<EventRow | null> {
   const rows = await query<EventRow>(`select * from events where id = $1`, [
     eventId,
@@ -85,20 +103,23 @@ export async function getCandidates(
   );
 }
 
-// 한 사람이 하나의 후보에 투표. 같은 이름이 다시 투표하면 기존 표를 교체합니다.
-export async function castVote(input: {
+// 한 사람이 여러 후보에 투표(복수 선택). 같은 이름이 다시 투표하면 기존 표를 통째로 교체.
+export async function castVotes(input: {
   eventId: string;
-  candidateId: string;
+  candidateIds: string[];
   voterName: string;
 }): Promise<void> {
-  await query(
-    `delete from votes where event_id = $1 and voter_name = $2`,
-    [input.eventId, input.voterName]
-  );
-  await query(
-    `insert into votes (event_id, candidate_id, voter_name) values ($1, $2, $3)`,
-    [input.eventId, input.candidateId, input.voterName]
-  );
+  await query(`delete from votes where event_id = $1 and voter_name = $2`, [
+    input.eventId,
+    input.voterName,
+  ]);
+  // 중복 후보 제거 후 각각 한 행씩 삽입 (후보 수가 적어 단순 반복으로 충분)
+  for (const candidateId of [...new Set(input.candidateIds)]) {
+    await query(
+      `insert into votes (event_id, candidate_id, voter_name) values ($1, $2, $3)`,
+      [input.eventId, candidateId, input.voterName]
+    );
+  }
 }
 
 // 후보별 득표 집계 + 투표자 명단(프로필 사진 포함) (2차 결과 화면 폴링용)

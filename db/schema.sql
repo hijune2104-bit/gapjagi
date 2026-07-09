@@ -53,6 +53,18 @@ create table if not exists participants (
 );
 create index if not exists idx_participants_event on participants(event_id);
 
+-- 7) availability: 회의 모듈 — 참여자별 가능 시간 슬롯. 한 사람당 한 행(이름 기준).
+--    slots 예: ["수-14","수-15","목-11"] (요일-시각 키). 히트맵 집계에 사용.
+create table if not exists availability (
+  event_id   uuid not null references events(id) on delete cascade,
+  voter_name text not null,               -- 응답자 이름 (로그인/게스트 공용)
+  account    text,                         -- 로그인 사용자면 account, 게스트면 null
+  slots      jsonb not null default '[]'::jsonb,
+  updated_at timestamptz not null default now(),
+  primary key (event_id, voter_name)
+);
+create index if not exists idx_availability_event on availability(event_id);
+
 -- 5) members: 조직도 API에서 동기화한 사용자 (이름·아이디만). 간이 로그인에 사용.
 --    아이디(로그인 식별자)는 조직도의 account 값(보통 이메일)을 사용.
 create table if not exists members (
