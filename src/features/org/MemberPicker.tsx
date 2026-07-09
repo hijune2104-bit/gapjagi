@@ -59,6 +59,8 @@ export default function MemberPicker({
 
   // 방향키로 후보 이동, 엔터로 선택, ESC로 검색어 지우기.
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    // 한글 IME 조합 확정 중의 Enter(조합확정용)는 무시 — 안 그러면 Enter가 2번 발생해 2개 선택됨.
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     if (matches.length === 0) return;
     if (e.key === "ArrowDown") {
       e.preventDefault();
@@ -88,7 +90,7 @@ export default function MemberPicker({
                 alignItems: "center",
                 gap: 6,
                 background: "var(--coral-bg)",
-                color: "var(--coral-d)",
+                color: "var(--ink)",
                 fontSize: 13,
                 fontWeight: 700,
                 padding: "4px 10px 4px 4px",
@@ -103,8 +105,7 @@ export default function MemberPicker({
                 style={{
                   border: "none",
                   background: "none",
-                  color: "var(--coral-d)",
-                  opacity: 0.6,
+                  color: "var(--muted)",
                   cursor: "pointer",
                   fontSize: 13,
                   padding: 0,
