@@ -14,14 +14,17 @@ const MODULE_EMOJI: Record<string, string> = {
   workshop: "🏢",
 };
 
-// 참여 카드에서 상태 뱃지 문구 + 이동 경로 결정
+// 참여 카드에서 상태 뱃지 문구 + 이동 경로 결정 (회식/회의 분기)
 function statusLabel(ev: MyEventSummary): string {
-  if (ev.has_plan) return "✅ 추천안 완성";
-  if (ev.status === "voting") return "🗳 투표 중";
+  if (ev.has_plan) return ev.module_type === "meeting" ? "✅ 시간 확정" : "✅ 추천안 완성";
+  if (ev.status === "voting") return ev.module_type === "meeting" ? "🗳 응답 취합 중" : "🗳 투표 중";
   if (ev.status === "closed") return "⏳ 마감";
   return "완료";
 }
 function destFor(ev: MyEventSummary): string {
+  if (ev.module_type === "meeting") {
+    return ev.has_plan ? `/m/${ev.id}/confirm` : `/m/${ev.id}`;
+  }
   if (ev.has_plan) return `/e/${ev.id}/plan`;
   if (ev.status === "voting") return `/e/${ev.id}`;
   return `/e/${ev.id}/result`;
@@ -41,8 +44,8 @@ const mods = [
     emoji: "📅",
     title: "갑자기 회의",
     desc: "가능 시간 모아 최적 시간·회의실까지",
-    href: "#",
-    soon: true,
+    href: "/create/meeting",
+    soon: false,
   },
   {
     key: "trip",

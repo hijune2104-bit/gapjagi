@@ -1,7 +1,7 @@
 // 갑자기(Gapjagi) 공용 타입.
 // DB 컬럼과 1:1로 맞추되, 클라이언트/서버가 함께 쓰는 형태로 정의합니다.
 
-export type ModuleType = "dinner" | "trip" | "workshop";
+export type ModuleType = "dinner" | "meeting" | "trip" | "workshop";
 export type EventStatus = "voting" | "closed" | "done";
 
 // 회식 모듈의 설정값 (events.config 에 jsonb 로 저장).
@@ -49,6 +49,34 @@ export interface CandidateMeta {
   lng?: number; // 경도
   tags?: string[]; // 주최자 메모 태그 (D-05, 투표 시 노출)
   ad?: boolean; // 제휴(광고) 후보 여부 (D-12)
+}
+
+// ===== 회의 모듈 (M-*) =====
+// events.config 에 저장하는 회의 그리드 정의.
+export interface MeetingConfig {
+  days: string[]; // 요일 라벨 ['월','화','수','목','금']
+  hours: number[]; // 시각 [10,11,...,17]
+  weekLabel?: string; // 표시용 (예: "다음 주")
+}
+
+// availability 한 행 = 한 사람의 가능 시간. slots 는 "요일-시각" 키 배열(예: "수-14").
+export interface MeetingResponder {
+  voter_name: string;
+  account: string | null;
+  slots: string[];
+}
+
+// 회의 확정 내용 (plans.content 에 kind:'meeting' 으로 저장).
+export interface MeetingConfirmation {
+  kind: "meeting";
+  slot: string; // "수-14"
+  attendeeCount: number; // 그 시각 가능 인원
+  totalCount: number; // 전체 응답자 수
+  excluded: string[]; // 조율에서 제외된 사람 이름
+  roomId: string | null;
+  roomName: string | null;
+  roomBooked: boolean;
+  prep: string[]; // 준비물/아젠다
 }
 
 // Kakao Local 검색 결과 1건 (클라이언트로 넘기는 정규화된 형태).
