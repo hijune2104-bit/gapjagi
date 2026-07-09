@@ -1,65 +1,101 @@
-import Image from "next/image";
+// 랜딩: 상황 3종 선택 (회식만 활성화, 나머지는 '곧')
+import Link from "next/link";
+import AuthStatus from "@/features/auth/AuthStatus";
+
+const situations = [
+  {
+    key: "dinner",
+    emoji: "🍻",
+    title: "갑자기 회식",
+    desc: "인원·예산·분위기 고르면 식당 투표부터 공지문까지",
+    href: "/create/dinner",
+    active: true,
+  },
+  {
+    key: "trip",
+    emoji: "✈️",
+    title: "갑자기 여행",
+    desc: "Day별 일정표와 예약 체크리스트",
+    href: "#",
+    active: false,
+  },
+  {
+    key: "workshop",
+    emoji: "🏢",
+    title: "갑자기 워크샵",
+    desc: "장소 투표와 세션 시간표, 준비물까지",
+    href: "#",
+    active: false,
+  },
+];
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="screen px-5 pb-10">
+      <header className="pt-8 pb-8">
+        <div className="flex items-center justify-between">
+          <div className="inline-flex items-center gap-1.5 rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-700">
+            ⚡ 3분 안에 실행 계획으로
+          </div>
+          <AuthStatus />
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+        <h1 className="mt-4 text-3xl font-extrabold leading-tight tracking-tight">
+          갑자기 잡힌 일정,
+          <br />
+          <span className="text-orange-500">다 같이 정하고</span> 바로 실행.
+        </h1>
+        <p className="mt-3 text-[15px] leading-relaxed text-stone-500">
+          뭘 정해야 할지 서비스가 알려줘요. 링크 공유로 팀원 투표받고, 공지문까지
+          자동으로 만들어 드려요.
+        </p>
+      </header>
+
+      <section className="flex flex-col gap-3">
+        <p className="px-1 text-sm font-semibold text-stone-400">
+          어떤 상황이세요?
+        </p>
+        {situations.map((s) => {
+          const inner = (
+            <div className="flex items-center gap-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200/70">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-2xl">
+                {s.emoji}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <h2 className="font-bold text-stone-800">{s.title}</h2>
+                  {!s.active && (
+                    <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-400">
+                      곧
+                    </span>
+                  )}
+                </div>
+                <p className="mt-0.5 truncate text-[13px] text-stone-500">
+                  {s.desc}
+                </p>
+              </div>
+              <span className="text-stone-300">›</span>
+            </div>
+          );
+
+          return s.active ? (
+            <Link
+              key={s.key}
+              href={s.href}
+              className="transition active:scale-[0.98]"
+            >
+              {inner}
+            </Link>
+          ) : (
+            <div key={s.key} className="cursor-not-allowed opacity-55">
+              {inner}
+            </div>
+          );
+        })}
+      </section>
+
+      <div className="mt-auto pt-10 text-center text-xs text-stone-400">
+        갑자기 · 해커톤 프로토타입
+      </div>
+    </main>
   );
 }
