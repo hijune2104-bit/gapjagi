@@ -24,12 +24,13 @@ export default function Logo({ height = 28 }: { height?: number }) {
         strokeOpacity="0.5"
         strokeWidth="3.5"
       />
-      {/* "갑" */}
+      {/* "갑" — 원본처럼 살짝 반시계 회전 (중심 기준) */}
       <text
         x="44"
         y="52"
         textAnchor="middle"
         dominantBaseline="central"
+        transform="rotate(-9 44 50)"
         fontFamily="Pretendard, sans-serif"
         fontWeight="800"
         fontSize="44"
