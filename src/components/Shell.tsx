@@ -5,21 +5,7 @@
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { ReactNode } from "react";
-
-// 상단 로고 (실제 로고 이미지 public/logo.png). 마크 + "갑자기" 워드마크 포함.
-function Logo() {
-  return (
-    <Link href="/" className="logo" aria-label="갑자기 홈">
-      {/* 외부 로더 불필요한 정적 이미지라 순수 img 사용 */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/logo.png"
-        alt="갑자기"
-        style={{ height: 28, width: "auto", display: "block" }}
-      />
-    </Link>
-  );
-}
+import Logo from "@/components/Logo";
 
 // 진행 단계 표시 (라벨 + 점). active(0-based)까지 on.
 function Steps({ labels, active }: { labels: string[]; active: number }) {
@@ -60,7 +46,9 @@ export default function Shell({
             ←
           </button>
         )}
-        <Logo />
+        <Link href="/" className="logo" aria-label="갑자기 홈">
+          <Logo />
+        </Link>
         {steps ? (
           <Steps labels={steps} active={activeStep} />
         ) : headerRight ? (
