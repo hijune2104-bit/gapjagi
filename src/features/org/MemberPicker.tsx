@@ -77,20 +77,38 @@ export default function MemberPicker({
 
   return (
     <div>
-      {/* 선택된 참여자 칩 */}
+      {/* 선택된 참여자 칩 (coral 톤) */}
       {value.length > 0 && (
-        <div className="mb-2 flex flex-wrap gap-1.5">
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
           {value.map((p) => (
             <span
               key={p.account}
-              className="flex items-center gap-1.5 rounded-full bg-orange-50 py-0.5 pl-0.5 pr-2 text-sm text-stone-700 ring-1 ring-orange-200"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                background: "var(--coral-bg)",
+                color: "var(--coral-d)",
+                fontSize: 13,
+                fontWeight: 700,
+                padding: "4px 10px 4px 4px",
+                borderRadius: 20,
+              }}
             >
               <Avatar name={p.name} photo={p.photo} size={22} />
               {p.name}
               <button
                 onClick={() => remove(p.account)}
-                className="ml-0.5 text-stone-400 hover:text-stone-600"
                 aria-label="참여자 제거"
+                style={{
+                  border: "none",
+                  background: "none",
+                  color: "var(--coral-d)",
+                  opacity: 0.6,
+                  cursor: "pointer",
+                  fontSize: 13,
+                  padding: 0,
+                }}
               >
                 ✕
               </button>
@@ -99,37 +117,72 @@ export default function MemberPicker({
         </div>
       )}
 
-      {/* 검색 입력 */}
+      {/* 검색 입력 (디자인 시스템 tinput) */}
       <input
+        className="tinput"
         value={q}
         onChange={(e) => setQ(e.target.value)}
         onKeyDown={onKeyDown}
         placeholder="이름으로 참여자 검색 (↑↓ 이동, Enter 선택)"
-        className="w-full rounded-xl bg-white px-4 py-3 text-[15px] ring-1 ring-stone-200 outline-none focus:ring-orange-400"
       />
 
       {/* 검색 결과 드롭다운 */}
       {matches.length > 0 && (
-        <div className="mt-2 flex flex-col gap-1 rounded-xl bg-white p-1 ring-1 ring-stone-200">
+        <div
+          style={{
+            marginTop: 8,
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+            background: "#fff",
+            border: "1px solid var(--line)",
+            borderRadius: 12,
+            padding: 5,
+          }}
+        >
           {matches.map((m, i) => (
             <button
               key={m.account}
               onClick={() => add(m)}
               onMouseEnter={() => setHi(i)}
-              className={`flex items-center gap-2.5 rounded-lg p-2 text-left ${
-                i === hi ? "bg-orange-50" : "hover:bg-stone-50"
-              }`}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                textAlign: "left",
+                border: "none",
+                cursor: "pointer",
+                borderRadius: 9,
+                padding: 8,
+                fontFamily: "inherit",
+                background: i === hi ? "var(--coral-bg)" : "transparent",
+              }}
             >
               <Avatar name={m.name} photo={m.photo} size={28} />
-              <div className="min-w-0">
-                <div className="text-sm font-semibold text-stone-800">
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "var(--ink)" }}>
                   {m.name}
                 </div>
-                <div className="truncate text-xs text-stone-400">
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "var(--muted)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
                   {m.account}
                 </div>
               </div>
-              <span className="ml-auto text-xs font-bold text-orange-500">
+              <span
+                style={{
+                  marginLeft: "auto",
+                  fontSize: 12,
+                  fontWeight: 800,
+                  color: "var(--coral)",
+                }}
+              >
                 + 추가
               </span>
             </button>
