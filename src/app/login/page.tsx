@@ -1,12 +1,14 @@
 "use client";
 
 // 간이 로그인 — 아이디(계정)를 입력하면 로그인. (해커톤용: 비밀번호 없음)
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Shell from "@/components/Shell";
 import { setSession } from "@/features/auth/session";
 
-export default function LoginPage() {
+// useSearchParams() 는 Suspense 경계 안에서만 프리렌더가 허용되므로,
+// 로직을 내부 컴포넌트로 분리하고 아래 export 에서 <Suspense> 로 감쌉니다.
+function LoginInner() {
   const router = useRouter();
   const params = useSearchParams();
   const redirect = params.get("redirect") || "/";
@@ -60,5 +62,21 @@ export default function LoginPage() {
         )}
       </div>
     </Shell>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <Shell>
+          <p className="helper" style={{ marginTop: 40, textAlign: "center" }}>
+            불러오는 중…
+          </p>
+        </Shell>
+      }
+    >
+      <LoginInner />
+    </Suspense>
   );
 }

@@ -116,6 +116,26 @@ export default function VotePage() {
   const meta = (config.moods ?? []).join(" · ");
   const joined = user && participants.some((p) => p.account === user.account);
 
+  // 회식 일시를 "7월 10일(목) 오후 7시" 형태로 — OG 미리보기 카드용
+  function prettyDate(s?: string): string | null {
+    if (!s) return null;
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return null;
+    const days = ["일", "월", "화", "수", "목", "금", "토"];
+    const h = d.getHours();
+    const ampm = h < 12 ? "오전" : "오후";
+    const h12 = h % 12 === 0 ? 12 : h % 12;
+    const min = d.getMinutes();
+    return `${d.getMonth() + 1}월 ${d.getDate()}일(${days[d.getDay()]}) ${ampm} ${h12}시${min ? ` ${min}분` : ""}`;
+  }
+  const whenText = prettyDate(config.scheduledAt);
+  // OG 카드에 보여줄 대표 이모지 — 분위기 태그에서 유추, 없으면 회식 기본
+  const ogEmoji = (config.moods ?? []).some((m) => m.includes("고기"))
+    ? "🍖"
+    : (config.moods ?? []).some((m) => m.includes("술") || m.includes("호프") || m.includes("포차"))
+      ? "🍻"
+      : "🍽️";
+
   return (
     <Shell
       steps={["선택", "의논", "완성"]}
@@ -139,6 +159,26 @@ export default function VotePage() {
         <div className="gh-meta">
           {config.headcount}명 · {config.budget}
           {meta ? ` · ${meta}` : ""}
+        </div>
+      </div>
+
+      {/* OG 미리보기 — 단톡방에 링크를 붙였을 때 뜨는 카드 (D-06) */}
+      <p className="helper" style={{ margin: "16px 0 6px" }}>
+        단톡방에 이렇게 뜹니다
+      </p>
+      <div className="og">
+        <div className="img">
+          {ogEmoji}
+          <div className="tag">🍻 갑자기 회식</div>
+        </div>
+        <div className="meta">
+          <h4>{event.title}</h4>
+          <p>
+            {[whenText, `${config.headcount}명`, `추천 ${candidates.length}곳`]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+          <div className="url">gapjagi.app/e/{eventId.slice(0, 8)}</div>
         </div>
       </div>
 
