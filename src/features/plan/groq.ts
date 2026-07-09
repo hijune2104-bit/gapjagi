@@ -2,16 +2,19 @@
 import Groq from "groq-sdk";
 import type { DinnerConfig, PlanContent, TallyItem } from "@/lib/types";
 
-const MODEL = "openai/gpt-oss-120b";
+export const GROQ_MODEL = "openai/gpt-oss-120b";
+const MODEL = GROQ_MODEL;
 
 // 지연 초기화: 모듈 로드 시점에 키가 없어도 앱이 죽지 않게 함수 안에서 생성.
-function getClient(): Groq {
+// (붙여넣기 파서 등 다른 기능에서도 재사용)
+export function getGroqClient(): Groq {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     throw new Error("GROQ_API_KEY 가 설정되지 않았습니다 (.env.local 확인).");
   }
   return new Groq({ apiKey });
 }
+const getClient = getGroqClient;
 
 // AI에게 넘길 입력 요약 + 원하는 출력(JSON) 스키마를 프롬프트로 지시합니다.
 function buildPrompt(input: {

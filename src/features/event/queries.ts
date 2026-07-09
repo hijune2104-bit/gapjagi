@@ -103,20 +103,23 @@ export async function getCandidates(
   );
 }
 
-// 한 사람이 하나의 후보에 투표. 같은 이름이 다시 투표하면 기존 표를 교체합니다.
-export async function castVote(input: {
+// 한 사람이 여러 후보에 투표(복수 선택). 같은 이름이 다시 투표하면 기존 표를 통째로 교체.
+export async function castVotes(input: {
   eventId: string;
-  candidateId: string;
+  candidateIds: string[];
   voterName: string;
 }): Promise<void> {
-  await query(
-    `delete from votes where event_id = $1 and voter_name = $2`,
-    [input.eventId, input.voterName]
-  );
-  await query(
-    `insert into votes (event_id, candidate_id, voter_name) values ($1, $2, $3)`,
-    [input.eventId, input.candidateId, input.voterName]
-  );
+  await query(`delete from votes where event_id = $1 and voter_name = $2`, [
+    input.eventId,
+    input.voterName,
+  ]);
+  // 중복 후보 제거 후 각각 한 행씩 삽입 (후보 수가 적어 단순 반복으로 충분)
+  for (const candidateId of [...new Set(input.candidateIds)]) {
+    await query(
+      `insert into votes (event_id, candidate_id, voter_name) values ($1, $2, $3)`,
+      [input.eventId, candidateId, input.voterName]
+    );
+  }
 }
 
 // 후보별 득표 집계 + 투표자 명단(프로필 사진 포함) (2차 결과 화면 폴링용)

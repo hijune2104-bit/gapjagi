@@ -26,7 +26,7 @@ export default function VotePage() {
   const [notFound, setNotFound] = useState(false);
 
   const [voterName, setVoterName] = useState("");
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string[]>([]); // 복수 선택
   const [submitting, setSubmitting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [joining, setJoining] = useState(false);
@@ -78,15 +78,21 @@ export default function VotePage() {
     }
   }
 
+  function toggleSelect(id: string) {
+    setSelected((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }
+
   async function vote() {
-    if (!selected || !voterName.trim()) return;
+    if (selected.length === 0 || !voterName.trim()) return;
     setSubmitting(true);
     localStorage.setItem("gapjagi:voterName", voterName.trim());
     try {
       const res = await fetch(`/api/events/${eventId}/vote`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ candidateId: selected, voterName: voterName.trim() }),
+        body: JSON.stringify({ candidateIds: selected, voterName: voterName.trim() }),
       });
       if (!res.ok) throw new Error();
       router.push(`/e/${eventId}/result`);
@@ -144,9 +150,13 @@ export default function VotePage() {
         <button
           className="cta"
           onClick={vote}
-          disabled={!selected || !voterName.trim() || submitting}
+          disabled={selected.length === 0 || !voterName.trim() || submitting}
         >
-          {submitting ? "투표 중…" : "투표하고 결과 보기"}
+          {submitting
+            ? "투표 중…"
+            : selected.length > 1
+              ? `${selected.length}곳에 투표하고 결과 보기`
+              : "투표하고 결과 보기"}
         </button>
       }
     >
@@ -233,17 +243,17 @@ export default function VotePage() {
         </div>
       </div>
 
-      {/* 후보 */}
+      {/* 후보 (복수 선택 가능) */}
       <div className="field">
-        <label>어디로 갈까요?</label>
+        <label>어디로 갈까요? · 여러 곳 선택 가능</label>
         {candidates.map((c) => {
-          const on = selected === c.id;
+          const on = selected.includes(c.id);
           const tags = c.meta?.tags ?? [];
           return (
             <div
               key={c.id}
               className={`cand${on ? " picked" : ""}`}
-              onClick={() => setSelected(c.id)}
+              onClick={() => toggleSelect(c.id)}
             >
               <div className="row1">
                 <div className={`selbox${on ? " on" : ""}`}>{on ? "✓" : ""}</div>

@@ -4,6 +4,7 @@
 // gapjagi.html 의 .grid/.gcell/.mine 클래스를 그대로 사용.
 import { Fragment, useEffect, useRef } from "react";
 import type { MeetingConfig } from "@/lib/types";
+import { allSlotKeys } from "@/features/meeting/grid";
 
 // 드래그로 여러 칸을 한 번에 칠하는 입력 그리드.
 export function PaintGrid({
@@ -34,11 +35,25 @@ export function PaintGrid({
     onChange([...next]);
   }
 
+  // 전체 선택/해제 토글
+  const allKeys = allSlotKeys(config);
+  const allSelected = allKeys.length > 0 && allKeys.every((k) => set.has(k));
+
   return (
-    <div
-      className="grid"
-      style={{ gridTemplateColumns: `36px repeat(${config.days.length}, 1fr)` }}
-    >
+    <>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+        <button
+          type="button"
+          className="chip sm"
+          onClick={() => onChange(allSelected ? [] : allKeys)}
+        >
+          {allSelected ? "전체 해제" : "✓ 전체 선택"}
+        </button>
+      </div>
+      <div
+        className="grid"
+        style={{ gridTemplateColumns: `36px repeat(${config.days.length}, 1fr)` }}
+      >
       <div className="gcell head" />
       {config.days.map((d) => (
         <div key={d} className="gcell head">
@@ -71,7 +86,8 @@ export function PaintGrid({
           })}
         </Fragment>
       ))}
-    </div>
+      </div>
+    </>
   );
 }
 

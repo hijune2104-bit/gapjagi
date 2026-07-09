@@ -7,13 +7,14 @@ import Shell from "@/components/Shell";
 import StaticMap from "@/components/StaticMap";
 import MemberPicker from "@/features/org/MemberPicker";
 import { useCurrentUser } from "@/features/auth/useCurrentUser";
+import {
+  BUDGETS,
+  FOODS,
+  PEOPLE,
+  REGIONS,
+  VIBES,
+} from "@/features/event/dinnerOptions";
 import type { Participant, PlaceResult } from "@/lib/types";
-
-const REGIONS = ["성수·왕십리", "강남·역삼", "홍대·합정", "판교·정자"];
-const PEOPLE = ["4명", "6명", "8명", "10명", "12명+"];
-const BUDGETS = ["1만원대", "2만원대", "3만원대", "4만원+"];
-const FOODS = ["고기", "해산물", "한식", "양식", "일식", "아무거나"];
-const VIBES = ["조용한 룸", "왁자지껄", "술 위주", "밥 위주"];
 const COMMENT_TAGS = [
   "룸 예약 확인",
   "전화로 확인함",
@@ -112,6 +113,12 @@ export default function CreateDinnerPage() {
   const [picked, setPicked] = useState<PlaceResult[]>([]);
   const [tags, setTags] = useState<Record<string, string[]>>({});
   const [submitting, setSubmitting] = useState(false);
+
+  // 붙여넣기 매직 (①) — 단톡방 대화 → 자동 완성
+  const [magicText, setMagicText] = useState("");
+  const [magicBusy, setMagicBusy] = useState(false);
+  const [magicMsg, setMagicMsg] = useState("");
+  const [magicError, setMagicError] = useState("");
 
   const conditionsDone =
     [dateIdx, region, people, budget, food, vibe].filter(
@@ -295,6 +302,100 @@ export default function CreateDinnerPage() {
     }
   }
 
+  // 붙여넣기 매직: 파싱 → 칩 채우기 → Kakao 검색 → 후보 3곳 자동 담기 → 투표 생성
+  async function magicFill() {
+    const text = magicText.trim();
+    if (!text || magicBusy) return;
+    setMagicError("");
+    setMagicBusy(true);
+    try {
+      setMagicMsg("대화를 읽는 중…");
+      const dates = dateOpts.map((d) => d.label);
+      const pr = await fetch("/api/parse-dinner", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, dates }),
+      });
+      if (!pr.ok) throw new Error("대화 분석에 실패했어요.");
+      const { parsed } = await pr.json();
+
+      // 빈 곳은 기본값으로 채워 데모가 끝까지 흐르게 함
+      const eff = {
+        region: (parsed.region as string) ?? "강남·역삼",
+        food: (parsed.food as string) ?? "고기",
+        people: (parsed.people as string) ?? "8명",
+        budget: (parsed.budget as string) ?? "3만원대",
+        vibe: parsed.vibe as string | null,
+      };
+      // 화면에 채워지는 게 보이도록 상태 반영
+      if (parsed.dateOffset != null) setDateIdx(parsed.dateOffset);
+      setRegion(eff.region);
+      setFood(eff.food);
+      setPeople(eff.people);
+      setBudget(eff.budget);
+      if (eff.vibe) setVibe(eff.vibe);
+
+      setMagicMsg(`${eff.region} · ${eff.food} 맛집 찾는 중…`);
+      const moods = [eff.food, eff.vibe].filter(Boolean).join(",");
+      const sr = await fetch(
+        `/api/places?${new URLSearchParams({ region: eff.region, moods })}`
+      );
+      const sdata = await sr.json();
+      const found: PlaceResult[] = sdata.places ?? [];
+      setSearched(true);
+      setByLocation(false);
+      setSearchError("");
+      setPlaces(found);
+
+      if (found.length < 2) {
+        setMagicMsg("");
+        setMagicError("맛집이 충분히 안 나왔어요. 아래에서 직접 골라주세요.");
+        return;
+      }
+      const picks = found.slice(0, 3);
+      setPicked(picks);
+
+      setMagicMsg("투표 링크 만드는 중…");
+      const cr = await fetch("/api/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: `갑자기 회식 · ${eff.region}`,
+          config: {
+            headcount: parsePeople(eff.people),
+            budget: eff.budget,
+            moods: [eff.food, eff.vibe].filter(Boolean),
+            memo: (parsed.memo as string) ?? "",
+            scheduledAt:
+              parsed.dateOffset != null ? dateOpts[parsed.dateOffset].iso : "",
+            region: eff.region,
+          },
+          participants,
+          candidates: picks.map((p) => ({
+            name: p.name,
+            meta: {
+              category: p.category,
+              address: p.address,
+              phone: p.phone,
+              placeUrl: p.placeUrl,
+              lat: p.lat,
+              lng: p.lng,
+              area: eff.region,
+              tags: [],
+            },
+          })),
+        }),
+      });
+      if (!cr.ok) throw new Error("투표 생성에 실패했어요.");
+      const { eventId } = await cr.json();
+      router.push(`/e/${eventId}`);
+    } catch (e) {
+      setMagicMsg("");
+      setMagicError(e instanceof Error ? e.message : "자동 완성에 실패했어요.");
+      setMagicBusy(false);
+    }
+  }
+
   const cta =
     picked.length === 0 ? (
       <button className="cta" disabled>
@@ -312,6 +413,39 @@ export default function CreateDinnerPage() {
 
   return (
     <Shell steps={["선택", "의논", "완성"]} activeStep={0} cta={cta}>
+      {/* ✨ 붙여넣기 매직 — 단톡방 대화 붙여넣으면 자동 완성 */}
+      <div className="cardbox" style={{ borderColor: "var(--coral)", background: "#FFF6F2" }}>
+        <h3>✨ 붙여넣기 매직</h3>
+        <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.6, margin: "4px 0 10px" }}>
+          단톡방 대화를 그대로 붙여넣으면 인원·메뉴·날짜·권역을 알아서 채우고 투표 링크까지 만들어요.
+        </p>
+        <textarea
+          className="tinput"
+          style={{ minHeight: 82, resize: "vertical", fontFamily: "inherit" }}
+          value={magicText}
+          onChange={(e) => setMagicText(e.target.value)}
+          placeholder={'예: "오늘 저녁 회식할까? 10명 정도, 강남에서 고기 어때. 조용한 룸으로"'}
+          disabled={magicBusy}
+        />
+        <button
+          className="cta"
+          style={{ marginTop: 10, fontSize: 15, padding: 13 }}
+          onClick={magicFill}
+          disabled={!magicText.trim() || magicBusy}
+        >
+          {magicBusy ? magicMsg || "채우는 중…" : "✨ 붙여넣고 자동 완성"}
+        </button>
+        {magicError && (
+          <p style={{ color: "var(--coral-d)", fontSize: 13, marginTop: 8, fontWeight: 600 }}>
+            {magicError}
+          </p>
+        )}
+      </div>
+
+      <p className="helper" style={{ textAlign: "center", margin: "18px 0 6px" }}>
+        또는 아래에서 직접 골라보세요 ↓
+      </p>
+
       <div className="qline">
         <span className="dot" />
         {conditionsDone < 6
