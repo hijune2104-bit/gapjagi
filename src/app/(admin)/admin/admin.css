@@ -415,6 +415,23 @@
   flex-shrink: 0;
 }
 
+/* 로그인 화면 */
+.adm-login {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1a1a1e;
+}
+.adm-login-card {
+  background: #fff;
+  border-radius: 18px;
+  padding: 40px 36px;
+  width: 100%;
+  max-width: 380px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
+}
+
 /* 반응형 */
 @media (max-width: 768px) {
   .adm {
