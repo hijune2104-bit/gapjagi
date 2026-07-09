@@ -113,3 +113,50 @@ export interface PlanRow {
   content: PlanContent;
   generated_at: string;
 }
+
+// ── 광고 파트너 ──
+
+export type AdPartnerCategory = "restaurant" | "travel" | "venue";
+export type AdPartnerStatus = "pending" | "approved" | "rejected" | "paused";
+
+export interface AdPartnerRow {
+  id: string;
+  business_name: string;
+  category: AdPartnerCategory;
+  contact_name: string | null;
+  contact_phone: string | null;
+  contact_email: string | null;
+  description: string | null;
+  address: string | null;
+  region: string | null;
+  lat: number | null;
+  lng: number | null;
+  place_url: string | null;
+  photo_url: string | null;
+  status: AdPartnerStatus;
+  created_at: string;
+}
+
+// ── 광고 계약 ──
+
+export type AdPlanType = "basic" | "premium" | "vip";
+export type AdContractStatus = "active" | "paused" | "expired" | "cancelled";
+
+export interface AdContractRow {
+  id: string;
+  partner_id: string;
+  module_type: ModuleType;
+  plan_type: AdPlanType;
+  monthly_fee: number;
+  start_date: string;
+  end_date: string;
+  priority: number;
+  status: AdContractStatus;
+  memo: string | null;
+  created_at: string;
+}
+
+export interface AdContractWithPartner extends AdContractRow {
+  business_name: string;
+  category: AdPartnerCategory;
+}

@@ -6,8 +6,22 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Shell from "@/components/Shell";
 import { setSession } from "@/features/auth/session";
 
-// useSearchParams() 는 Suspense 경계 안에서만 프리렌더가 허용되므로,
-// 로직을 내부 컴포넌트로 분리하고 아래 export 에서 <Suspense> 로 감쌉니다.
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <Shell>
+          <p className="helper" style={{ marginTop: 40, textAlign: "center" }}>
+            불러오는 중…
+          </p>
+        </Shell>
+      }
+    >
+      <LoginInner />
+    </Suspense>
+  );
+}
+
 function LoginInner() {
   const router = useRouter();
   const params = useSearchParams();
@@ -62,21 +76,5 @@ function LoginInner() {
         )}
       </div>
     </Shell>
-  );
-}
-
-export default function LoginPage() {
-  return (
-    <Suspense
-      fallback={
-        <Shell>
-          <p className="helper" style={{ marginTop: 40, textAlign: "center" }}>
-            불러오는 중…
-          </p>
-        </Shell>
-      }
-    >
-      <LoginInner />
-    </Suspense>
   );
 }

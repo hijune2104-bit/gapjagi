@@ -163,3 +163,57 @@ export async function getLatestPlan(
   );
   return rows[0] ?? null;
 }
+
+// ── Admin 전용 ──
+
+// 전체 이벤트 목록 (투표 수, 후보 수 포함)
+export interface EventSummary extends EventRow {
+  candidate_count: number;
+  vote_count: number;
+  voter_count: number;
+}
+
+export async function listAllEvents(filters?: {
+  status?: string;
+  module_type?: string;
+}): Promise<EventSummary[]> {
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+  if (filters?.status) {
+    params.push(filters.status);
+    conditions.push(`e.status = $${params.length}`);
+  }
+  if (filters?.module_type) {
+    params.push(filters.module_type);
+    conditions.push(`e.module_type = $${params.length}`);
+  }
+  const where = conditions.length ? `where ${conditions.join(" and ")}` : "";
+  return query<EventSummary>(
+    `select e.*,
+       (select count(*)::int from candidates c where c.event_id = e.id) as candidate_count,
+       (select count(*)::int from votes v where v.event_id = e.id) as vote_count,
+       (select count(distinct voter_name)::int from votes v where v.event_id = e.id) as voter_count
+     from events e ${where}
+     order by e.created_at desc`,
+    params
+  );
+}
+
+export async function updateEventStatus(
+  eventId: string,
+  status: string
+): Promise<EventRow | null> {
+  const rows = await query<EventRow>(
+    `update events set status = $1 where id = $2 returning *`,
+    [status, eventId]
+  );
+  return rows[0] ?? null;
+}
+
+export async function deleteEvent(eventId: string): Promise<boolean> {
+  const rows = await query<{ id: string }>(
+    `delete from events where id = $1 returning id`,
+    [eventId]
+  );
+  return rows.length > 0;
+}

@@ -54,3 +54,50 @@ export async function countMembers(): Promise<number> {
   const rows = await query<{ n: string }>(`select count(*)::int as n from members`);
   return Number(rows[0]?.n ?? 0);
 }
+
+// ── Admin 전용 ──
+
+export async function deleteMember(account: string): Promise<boolean> {
+  const rows = await query<{ account: string }>(
+    `delete from members where account = $1 returning account`,
+    [account]
+  );
+  return rows.length > 0;
+}
+
+export async function updateMember(
+  account: string,
+  input: { name?: string; photo?: string | null }
+): Promise<Member | null> {
+  const sets: string[] = [];
+  const params: unknown[] = [];
+  if (input.name !== undefined) {
+    params.push(input.name);
+    sets.push(`name = $${params.length}`);
+  }
+  if (input.photo !== undefined) {
+    params.push(input.photo);
+    sets.push(`photo = $${params.length}`);
+  }
+  if (sets.length === 0) return getMember(account);
+  params.push(account);
+  const rows = await query<Member>(
+    `update members set ${sets.join(", ")} where account = $${params.length} returning account, name, photo`,
+    params
+  );
+  return rows[0] ?? null;
+}
+
+export async function createMember(input: {
+  account: string;
+  name: string;
+  photo?: string | null;
+}): Promise<Member> {
+  const [row] = await query<Member>(
+    `insert into members (account, name, photo) values ($1, $2, $3)
+     on conflict (account) do update set name = excluded.name, photo = excluded.photo
+     returning account, name, photo`,
+    [input.account, input.name, input.photo ?? null]
+  );
+  return row;
+}

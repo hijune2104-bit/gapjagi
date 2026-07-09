@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:setup": "psql -d gapjagi -f db/schema.sql"
+    "db:setup": "psql -d gapjagi -f db/schema.sql && psql -d gapjagi -f db/ad_schema.sql",
+    "db:ad-setup": "psql -d gapjagi -f db/ad_schema.sql"
   },
   "dependencies": {
     "groq-sdk": "^1.3.0",
