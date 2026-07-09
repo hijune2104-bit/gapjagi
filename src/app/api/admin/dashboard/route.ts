@@ -49,5 +49,33 @@ export async function GET() {
     memberCount = Number(mc.n);
   } catch {}
 
-  return NextResponse.json({ ...adStats, eventStats, memberCount });
+  // 광고 성과
+  let adPerformance: { partner: string; impressions: number; clicks: number }[] = [];
+  let totalImpressions = 0;
+  let totalClicks = 0;
+  try {
+    const perfRows = await query<{ business_name: string; impressions: string; clicks: string }>(
+      `select p.business_name,
+         count(*) filter (where i.event_type = 'impression')::int as impressions,
+         count(*) filter (where i.event_type = 'click')::int as clicks
+       from ad_impressions i
+       join ad_partners p on p.id = i.partner_id
+       group by p.business_name
+       order by impressions desc`
+    );
+    adPerformance = perfRows.map((r) => ({
+      partner: r.business_name,
+      impressions: Number(r.impressions),
+      clicks: Number(r.clicks),
+    }));
+    const [totals] = await query<{ imp: string; clk: string }>(
+      `select count(*) filter (where event_type='impression')::int as imp,
+              count(*) filter (where event_type='click')::int as clk
+       from ad_impressions`
+    );
+    totalImpressions = Number(totals.imp);
+    totalClicks = Number(totals.clk);
+  } catch {}
+
+  return NextResponse.json({ ...adStats, eventStats, memberCount, adPerformance, totalImpressions, totalClicks });
 }

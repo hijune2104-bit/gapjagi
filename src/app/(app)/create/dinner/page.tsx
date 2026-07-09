@@ -104,7 +104,16 @@ export default function CreateDinnerPage() {
       setPlaces(placesData.places ?? []);
 
       const adData = await adRes.json().catch(() => ({ places: [] }));
-      setSponsored(adData.places ?? []);
+      const ads = adData.places ?? [];
+      setSponsored(ads);
+      // 광고 노출 추적
+      for (const ad of ads) {
+        fetch("/api/ad/track", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ partner_name: ad.name, event_type: "impression", module_type: "dinner", region: region.trim() }),
+        }).catch(() => {});
+      }
     } catch (e) {
       setSearchError(e instanceof Error ? e.message : "검색에 실패했습니다.");
       setPlaces([]);
@@ -351,6 +360,13 @@ export default function CreateDinnerPage() {
           {sponsored.map((sp) => {
             const asPr: PlaceResult = { name: sp.name, category: sp.category, address: sp.address, phone: sp.phone, placeUrl: sp.placeUrl, lat: sp.lat, lng: sp.lng };
             const picked = isPicked(asPr);
+            function trackClick() {
+              fetch("/api/ad/track", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ partner_name: sp.name, event_type: "click", module_type: "dinner", region: region.trim() }),
+              }).catch(() => {});
+            }
             return (
               <div
                 key={`ad-${sp.name}`}
@@ -358,13 +374,13 @@ export default function CreateDinnerPage() {
               >
                 <div className="flex items-start gap-3">
                   {sp.lat && sp.lng ? (
-                    <a href={sp.placeUrl || "#"} target="_blank" rel="noopener noreferrer" className="shrink-0 overflow-hidden rounded-lg ring-1 ring-stone-200">
+                    <a href={sp.placeUrl || "#"} target="_blank" rel="noopener noreferrer" onClick={trackClick} className="shrink-0 overflow-hidden rounded-lg ring-1 ring-stone-200">
                       <StaticMap lat={sp.lat} lng={sp.lng} size={72} />
                     </a>
                   ) : (
                     <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-lg bg-amber-50 text-2xl">🏪</div>
                   )}
-                  <button onClick={() => togglePick(asPr)} className="min-w-0 flex-1 text-left">
+                  <button onClick={() => { trackClick(); togglePick(asPr); }} className="min-w-0 flex-1 text-left">
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span className="adbadge">AD · 제휴</span>
                       <span className="font-bold text-stone-800">{sp.name}</span>

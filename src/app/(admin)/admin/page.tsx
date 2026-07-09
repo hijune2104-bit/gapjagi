@@ -15,6 +15,9 @@ interface Stats {
   byPlan: { plan_type: string; count: number; revenue: number }[];
   eventStats: { total: number; voting: number; closed: number; done: number; totalVotes: number };
   memberCount: number;
+  adPerformance: { partner: string; impressions: number; clicks: number }[];
+  totalImpressions: number;
+  totalClicks: number;
 }
 
 const categoryLabel: Record<string, string> = {
@@ -133,6 +136,47 @@ export default function AdminDashboard() {
           ))}
         </div>
       </div>
+
+      {/* 광고 성과 */}
+      <h2 style={{ fontSize: 16, fontWeight: 800, marginBottom: 12, marginTop: 28, color: "#83828b" }}>광고 성과</h2>
+      <div className="adm-stats">
+        <div className="adm-stat">
+          <div className="adm-stat-label">총 노출</div>
+          <div className="adm-stat-value">{fmt(stats.totalImpressions)}</div>
+        </div>
+        <div className="adm-stat">
+          <div className="adm-stat-label">총 클릭</div>
+          <div className="adm-stat-value">{fmt(stats.totalClicks)}</div>
+        </div>
+        <div className="adm-stat">
+          <div className="adm-stat-label">클릭률 (CTR)</div>
+          <div className="adm-stat-value coral">
+            {stats.totalImpressions > 0
+              ? `${((stats.totalClicks / stats.totalImpressions) * 100).toFixed(1)}%`
+              : "-"}
+          </div>
+        </div>
+      </div>
+
+      {stats.adPerformance.length > 0 && (
+        <div className="adm-chart-card" style={{ marginTop: 16 }}>
+          <h3>파트너별 성과</h3>
+          {stats.adPerformance.map((p) => {
+            const maxImp = Math.max(...stats.adPerformance.map((x) => x.impressions), 1);
+            return (
+              <div key={p.partner} className="adm-bar-row">
+                <span className="adm-bar-label">{p.partner}</span>
+                <div className="adm-bar-track">
+                  <div className="adm-bar-fill" style={{ width: `${(p.impressions / maxImp) * 100}%` }} />
+                </div>
+                <span className="adm-bar-value" style={{ width: 100 }}>
+                  {p.impressions}노출 / {p.clicks}클릭
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* 바로가기 */}
       <div style={{ display: "flex", gap: 10, marginTop: 24, flexWrap: "wrap" }}>

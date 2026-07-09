@@ -39,3 +39,16 @@ create index if not exists idx_ad_partners_status on ad_partners(status);
 create index if not exists idx_ad_contracts_partner on ad_contracts(partner_id);
 create index if not exists idx_ad_contracts_status on ad_contracts(status);
 create index if not exists idx_ad_contracts_dates on ad_contracts(start_date, end_date);
+
+-- 3) ad_impressions: 광고 노출/클릭 추적
+create table if not exists ad_impressions (
+  id          uuid primary key default gen_random_uuid(),
+  partner_id  uuid not null references ad_partners(id) on delete cascade,
+  event_type  text not null default 'impression',  -- 'impression' | 'click'
+  module_type text not null default 'dinner',
+  region      text,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists idx_ad_impressions_partner on ad_impressions(partner_id);
+create index if not exists idx_ad_impressions_date on ad_impressions(created_at);
