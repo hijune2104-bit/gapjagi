@@ -18,6 +18,7 @@ interface Stats {
   adPerformance: { partner: string; impressions: number; clicks: number }[];
   totalImpressions: number;
   totalClicks: number;
+  expiringContracts: { id: string; business_name: string; end_date: string; days_left: number }[];
 }
 
 const categoryLabel: Record<string, string> = {
@@ -58,6 +59,23 @@ export default function AdminDashboard() {
       <div className="adm-header">
         <h1>대시보드</h1>
       </div>
+
+      {/* 만료 임박 알림 */}
+      {stats.expiringContracts.length > 0 && (
+        <div style={{ background: "#fff6e9", border: "1px solid #f3d19a", borderRadius: 14, padding: 16, marginBottom: 20 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 800, color: "#b77400", marginBottom: 8 }}>
+            ⚠ 만료 임박 계약 ({stats.expiringContracts.length}건)
+          </h3>
+          {stats.expiringContracts.map((c) => (
+            <div key={c.id} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", fontSize: 13 }}>
+              <span style={{ fontWeight: 700 }}>{c.business_name}</span>
+              <span style={{ color: c.days_left <= 3 ? "#a32d2d" : "#b77400", fontWeight: 700 }}>
+                {c.days_left === 0 ? "오늘 만료" : `${c.days_left}일 남음 (${c.end_date})`}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* 서비스 현황 */}
       <h2 style={{ fontSize: 16, fontWeight: 800, marginBottom: 12, color: "#83828b" }}>서비스 현황</h2>

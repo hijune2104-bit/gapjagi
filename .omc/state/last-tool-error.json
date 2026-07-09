@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"ls /opt/homebrew/opt/postgresql@16/ 2>/dev/null && echo \\\"---\\\" && brew list postgresql@16 2>/dev/null | head -20\",\"description\":\"Check PostgreSQL 16 installation details\"}",
+  "error": "Exit code 1",
+  "timestamp": "2026-07-09T05:17:32.641Z",
+  "retry_count": 2
+}

@@ -77,5 +77,19 @@ export async function GET() {
     totalClicks = Number(totals.clk);
   } catch {}
 
-  return NextResponse.json({ ...adStats, eventStats, memberCount, adPerformance, totalImpressions, totalClicks });
+  // 만료 임박 계약 (7일 이내)
+  let expiringContracts: { id: string; business_name: string; end_date: string; days_left: number }[] = [];
+  try {
+    expiringContracts = await query<{ id: string; business_name: string; end_date: string; days_left: string }>(
+      `select c.id, p.business_name, c.end_date::text,
+              (c.end_date - current_date)::int as days_left
+       from ad_contracts c
+       join ad_partners p on p.id = c.partner_id
+       where c.status = 'active'
+         and c.end_date between current_date and current_date + interval '7 days'
+       order by c.end_date asc`
+    ).then((rows) => rows.map((r) => ({ ...r, days_left: Number(r.days_left) })));
+  } catch {}
+
+  return NextResponse.json({ ...adStats, eventStats, memberCount, adPerformance, totalImpressions, totalClicks, expiringContracts });
 }

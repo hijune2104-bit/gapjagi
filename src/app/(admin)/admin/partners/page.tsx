@@ -46,6 +46,7 @@ export default function PartnersPage() {
       <div className="adm-header">
         <h1>광고 파트너</h1>
         <div className="adm-header-actions">
+          <a href="/api/admin/export?type=partners" className="adm-btn ghost" download>CSV 내보내기</a>
           <Link href="/admin/partners/new" className="adm-btn primary">
             + 파트너 등록
           </Link>

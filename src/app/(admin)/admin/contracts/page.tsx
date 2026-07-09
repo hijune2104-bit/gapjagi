@@ -55,6 +55,7 @@ export default function ContractsPage() {
       <div className="adm-header">
         <h1>광고 계약</h1>
         <div className="adm-header-actions">
+          <a href="/api/admin/export?type=contracts" className="adm-btn ghost" download>CSV 내보내기</a>
           <Link href="/admin/contracts/new" className="adm-btn primary">
             + 계약 등록
           </Link>

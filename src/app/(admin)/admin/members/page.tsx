@@ -83,6 +83,7 @@ export default function MembersPage() {
       <div className="adm-header">
         <h1>멤버 관리</h1>
         <div className="adm-header-actions">
+          <a href="/api/admin/export?type=members" className="adm-btn ghost" download>CSV 내보내기</a>
           <button className="adm-btn ghost" onClick={handleSync} disabled={syncing}>
             {syncing ? "동기화 중..." : "조직도 동기화"}
           </button>
