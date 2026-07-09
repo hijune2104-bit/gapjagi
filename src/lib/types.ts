@@ -35,6 +35,8 @@ export interface CandidateMeta {
   placeUrl?: string; // 카카오맵 상세페이지 (리뷰/후기 확인용 링크)
   lat?: number; // 위도 (지도 표시용)
   lng?: number; // 경도
+  tags?: string[]; // 주최자 메모 태그 (D-05, 투표 시 노출)
+  ad?: boolean; // 제휴(광고) 후보 여부 (D-12)
 }
 
 // Kakao Local 검색 결과 1건 (클라이언트로 넘기는 정규화된 형태).
