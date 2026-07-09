@@ -1,0 +1,1216 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>갑자기 — 갑자기 잡힌 일정, 3분 안에 실행 계획으로</title>
+
+<!-- OG 태그 데모: 카톡 공유 시 이렇게 노출됩니다 (실제 서비스에선 SSR로 상황별 동적 생성) -->
+<meta property="og:title" content="🍖 갑자기 회식 · 10명">
+<meta property="og:description" content="고기 먹으러 갈 집, 같이 골라줘!">
+<meta property="og:image" content="https://gapjagi.app/og/dinner.png">
+<meta property="og:url" content="https://gapjagi.app/s/x7Qk2">
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+  :root{
+    --ink:#1A1A1E; --muted:#83828B; --line:#ECEAE4; --soft:#F4F3EF;
+    --paper:#FFFFFF; --desk:#E7E4DD;
+    --coral:#FF5A32; --coral-d:#E23D12; --coral-bg:#FFEDE6;
+    --mint:#06B981; --mint-bg:#E3F7EF; --mint-d:#04895F;
+    --radius:16px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    font-family:"Pretendard",-apple-system,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;
+    background:var(--desk); color:var(--ink);
+    display:flex; align-items:center; justify-content:center;
+    line-height:1.5; letter-spacing:-0.01em;
+  }
+  /* phone frame */
+  .phone{
+    width:100%; max-width:420px; height:100dvh; max-height:880px;
+    background:var(--paper); position:relative; overflow:hidden;
+    display:flex; flex-direction:column;
+    box-shadow:0 24px 60px rgba(30,25,15,.22);
+  }
+  @media(min-width:460px){ .phone{ border-radius:34px; height:min(880px,94dvh); } }
+
+  /* top bar */
+  .bar{ display:flex; align-items:center; gap:10px; padding:16px 18px 12px;
+    border-bottom:1px solid var(--line); background:var(--paper); z-index:5; flex-shrink:0; }
+  .bar .back{ width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:#fff;
+    font-size:18px;cursor:pointer;display:none;align-items:center;justify-content:center;color:var(--ink) }
+  .bar.has-back .back{ display:flex }
+  .logo{ font-weight:900; font-size:19px; letter-spacing:-0.03em; display:flex; align-items:center; gap:7px }
+  .logo .mark{ display:flex; flex-shrink:0 }
+  .logo .wm{ color:var(--ink) }
+  .logo b{ color:var(--coral) }
+  .steps{ margin-left:auto; display:flex; gap:6px; align-items:center }
+  .steps span{ font-size:12px; font-weight:600; color:#C9C7C1 }
+  .steps span.on{ color:var(--coral) }
+  .steps i{ width:5px;height:5px;border-radius:50%;background:#DCDAD3 }
+  .steps i.on{ background:var(--coral) }
+
+  /* scroll area */
+  .scroll{ flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:22px 18px 120px }
+  .screen{ animation:slide .32s cubic-bezier(.2,.7,.3,1) both }
+  @keyframes slide{ from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:none} }
+
+  .kicker{ font-size:13px; font-weight:700; color:var(--coral); margin-bottom:7px }
+  h1.title{ font-size:26px; font-weight:900; letter-spacing:-0.04em; line-height:1.22 }
+  .sub{ color:var(--muted); font-size:14.5px; margin-top:9px }
+
+  /* home cards */
+  .mods{ display:flex; flex-direction:column; gap:12px; margin-top:26px }
+  .mod{ display:flex; align-items:center; gap:14px; padding:18px; background:#fff;
+    border:1px solid var(--line); border-radius:var(--radius); cursor:pointer; transition:.16s;
+    text-align:left; width:100%; font-family:inherit }
+  .mod:active{ transform:scale(.98) }
+  .mod:hover{ border-color:#D8D5CD; box-shadow:0 6px 18px rgba(30,25,15,.06) }
+  .mod .emo{ font-size:28px; width:52px;height:52px;flex-shrink:0;border-radius:14px;
+    background:var(--soft); display:flex; align-items:center; justify-content:center }
+  .mod h3{ font-size:16.5px; font-weight:800 }
+  .mod p{ font-size:13px; color:var(--muted); margin-top:2px }
+  .mod .go{ margin-left:auto; color:#C9C7C1; font-size:20px }
+  .mod.soon{ opacity:.55 }
+  .mod.soon .go::after{ content:"곧"; font-size:11px; font-weight:700; color:var(--muted);
+    background:var(--soft); padding:3px 8px; border-radius:20px }
+  .mod.soon .go{ font-size:0 }
+
+  /* prompt line (guided, no blank input) */
+  .qline{ display:flex; align-items:center; gap:9px; background:var(--coral-bg); color:var(--coral-d);
+    font-weight:700; font-size:14px; padding:11px 14px; border-radius:12px; margin-bottom:20px }
+  .qline .dot{ width:7px;height:7px;border-radius:50%;background:var(--coral);
+    animation:pulse 1.3s infinite }
+  @keyframes pulse{ 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  .field{ margin-bottom:22px }
+  .field label{ font-size:14px; font-weight:800; display:block; margin-bottom:11px }
+  .chips{ display:flex; flex-wrap:wrap; gap:8px }
+  .chip{ font-family:inherit; font-size:14px; font-weight:600; padding:10px 15px; border-radius:22px;
+    background:var(--soft); border:1.5px solid transparent; color:#5C5B62; cursor:pointer; transition:.14s }
+  .chip:active{ transform:scale(.94) }
+  .chip.on{ background:var(--coral); color:#fff; border-color:var(--coral) }
+
+  /* CTA */
+  .cta-wrap{ position:absolute; left:0; right:0; bottom:0; padding:14px 18px calc(14px + env(safe-area-inset-bottom));
+    background:linear-gradient(to top,var(--paper) 70%,transparent); z-index:6 }
+  .cta{ width:100%; font-family:inherit; font-size:16.5px; font-weight:800; color:#fff;
+    background:var(--coral); border:none; border-radius:15px; padding:16px; cursor:pointer; transition:.16s }
+  .cta:active{ transform:scale(.985) }
+  .cta:disabled{ background:#E4E2DC; color:#B4B2AA; cursor:not-allowed }
+  .cta.ghost{ background:#fff; color:var(--ink); border:1.5px solid var(--line) }
+  .cta.mint{ background:var(--mint) }
+
+  /* OG preview card */
+  .og{ border:1px solid var(--line); border-radius:14px; overflow:hidden; margin:6px 0 18px;
+    box-shadow:0 4px 14px rgba(30,25,15,.06) }
+  .og .img{ height:150px; background:linear-gradient(135deg,#FF7A45,#FF3D6E); position:relative;
+    display:flex; align-items:center; justify-content:center; font-size:56px }
+  .og .img .tag{ position:absolute; top:12px; left:12px; background:rgba(0,0,0,.28); color:#fff;
+    font-size:12px; font-weight:700; padding:5px 11px; border-radius:20px; backdrop-filter:blur(4px) }
+  .og .meta{ padding:13px 15px; background:#fff }
+  .og .meta h4{ font-size:15px; font-weight:800 }
+  .og .meta p{ font-size:13px; color:var(--muted); margin-top:3px }
+  .og .meta .url{ font-size:12px; color:#B7B5AE; margin-top:8px }
+
+  .linkbox{ display:flex; gap:8px; align-items:center; background:var(--soft); border-radius:12px;
+    padding:12px 14px; margin-bottom:8px }
+  .linkbox .u{ font-size:13.5px; font-weight:600; color:#57565D; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+  .linkbox button{ margin-left:auto; flex-shrink:0; font-family:inherit; font-size:13px; font-weight:700;
+    color:var(--coral); background:var(--coral-bg); border:none; padding:8px 13px; border-radius:9px; cursor:pointer }
+
+  /* candidate vote cards */
+  .cand{ border:1.5px solid var(--line); border-radius:14px; padding:15px; margin-bottom:11px;
+    cursor:pointer; transition:.16s; background:#fff; position:relative; overflow:hidden }
+  .cand:active{ transform:scale(.99) }
+  .cand.picked{ border-color:var(--coral); background:var(--coral-bg) }
+  .cand .fill{ position:absolute; left:0; top:0; bottom:0; background:rgba(6,185,129,.10);
+    width:0; transition:width .7s cubic-bezier(.2,.8,.2,1); z-index:0 }
+  .cand > *{ position:relative; z-index:1 }
+  .cand .row1{ display:flex; align-items:flex-start; gap:11px }
+  .cand .ph{ width:46px;height:46px;flex-shrink:0;border-radius:11px;background:var(--soft);
+    display:flex;align-items:center;justify-content:center;font-size:22px }
+  .cand h4{ font-size:15.5px; font-weight:800 }
+  .cand .info{ font-size:12.5px; color:var(--muted); margin-top:3px; display:flex; gap:8px; flex-wrap:wrap }
+  .cand .info .star{ color:#F5A623; font-weight:700 }
+  .cand .votes{ margin-left:auto; text-align:right; flex-shrink:0 }
+  .cand .votes b{ font-size:19px; font-weight:900; color:var(--mint-d) }
+  .cand .votes span{ font-size:11px; color:var(--muted); display:block }
+  .cand .pill{ display:inline-block; font-size:11px; font-weight:700; color:var(--coral-d);
+    background:var(--coral-bg); padding:3px 9px; border-radius:20px; margin-top:9px }
+  .cand .avatars{ display:flex; margin-top:10px; gap:0 }
+  .cand .avatars i{ width:22px;height:22px;border-radius:50%;font-size:11px;font-weight:700;color:#fff;
+    display:flex;align-items:center;justify-content:center;margin-left:-5px;border:2px solid #fff }
+
+  .livebar{ display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color:var(--muted);
+    margin:2px 0 16px }
+  .livebar .live{ display:flex; align-items:center; gap:5px; color:var(--mint-d) }
+  .livebar .live .d{ width:6px;height:6px;border-radius:50%;background:var(--mint);animation:pulse 1.2s infinite }
+
+  /* result */
+  .winner{ background:linear-gradient(135deg,#FF7A45,#FF3D6E); border-radius:18px; padding:22px;
+    color:#fff; margin-bottom:16px }
+  .winner .crown{ font-size:30px }
+  .winner h2{ font-size:22px; font-weight:900; margin-top:6px }
+  .winner p{ font-size:13.5px; opacity:.92; margin-top:4px }
+  .winner .bar2{ display:inline-flex; gap:6px; align-items:center; background:rgba(255,255,255,.22);
+    padding:5px 11px; border-radius:20px; font-size:12.5px; font-weight:700; margin-top:12px }
+
+  .cardbox{ border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:12px; background:#fff }
+  .cardbox h3{ font-size:13px; font-weight:800; color:var(--muted); margin-bottom:12px; letter-spacing:.01em }
+  .kv{ display:flex; justify-content:space-between; padding:8px 0; font-size:14.5px; border-bottom:1px dashed var(--line) }
+  .kv:last-child{ border:none }
+  .kv .k{ color:var(--muted) }
+  .kv .v{ font-weight:700 }
+  .kv .v.big{ color:var(--coral); font-size:18px; font-weight:900 }
+  .maplink{ display:flex; align-items:center; gap:8px; justify-content:center; text-decoration:none;
+    color:var(--ink); font-weight:700; font-size:14px; border:1.5px solid var(--line); border-radius:12px;
+    padding:13px; margin-top:4px }
+
+  /* notice / checklist */
+  .notice{ background:var(--soft); border-radius:14px; padding:16px; font-size:14px; line-height:1.7;
+    white-space:pre-wrap; margin-bottom:8px }
+  .check{ display:flex; align-items:center; gap:11px; padding:13px 0; border-bottom:1px solid var(--line); cursor:pointer }
+  .check:last-child{ border:none }
+  .check .box{ width:22px;height:22px;border-radius:7px;border:2px solid #D6D4CD;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;transition:.14s;font-size:13px;color:#fff }
+  .check.done .box{ background:var(--mint); border-color:var(--mint) }
+  .check.done span{ color:#B7B5AE; text-decoration:line-through }
+  .check span{ font-size:14.5px; font-weight:600 }
+
+  /* meeting grid */
+  .helper{ font-size:13px; color:var(--muted); margin:2px 0 16px }
+  .grid{ display:grid; gap:3px; user-select:none; touch-action:none }
+  .gcell{ height:34px; border-radius:6px; background:var(--soft); display:flex; align-items:center;
+    justify-content:center; font-size:11px; font-weight:700; color:#B7B5AE; transition:background .1s }
+  .gcell.head{ background:transparent; color:var(--muted); font-weight:700; height:26px }
+  .gcell.timelabel{ background:transparent; color:var(--muted); font-size:11px; justify-content:flex-end; padding-right:6px }
+  .gcell.mine{ background:var(--coral); color:#fff }
+  .legend{ display:flex; align-items:center; gap:14px; font-size:12px; color:var(--muted); margin:16px 0 8px; flex-wrap:wrap }
+  .legend .sw{ width:16px;height:16px;border-radius:4px;display:inline-block;vertical-align:-3px;margin-right:5px }
+  .best{ background:var(--mint-bg); border:1px solid #BCEBD8; border-radius:14px; padding:16px; margin-bottom:12px }
+  .best h3{ color:var(--mint-d); font-size:13px; font-weight:800; margin-bottom:8px }
+  .best .big{ font-size:20px; font-weight:900 }
+  .best .who{ font-size:13px; color:var(--muted); margin-top:6px }
+
+  /* templates */
+  .sectlabel{ display:flex; align-items:baseline; gap:8px; margin:30px 0 12px }
+  .sectlabel h2{ font-size:16px; font-weight:900 }
+  .sectlabel span{ font-size:12.5px; color:var(--muted) }
+  .tscroll{ display:flex; gap:11px; overflow-x:auto; margin:0 -18px; padding:0 18px 6px; scroll-snap-type:x mandatory }
+  .tscroll::-webkit-scrollbar{ display:none }
+  .tcard{ flex:0 0 160px; scroll-snap-align:start; background:#fff; border:1px solid var(--line);
+    border-radius:14px; padding:14px; cursor:pointer; transition:.16s; text-align:left; font-family:inherit }
+  .tcard:active{ transform:scale(.97) }
+  .tcard .temo{ font-size:24px }
+  .tcard h4{ font-size:14px; font-weight:800; margin-top:9px; line-height:1.3 }
+  .tcard .by{ font-size:12px; color:var(--muted); margin-top:8px; display:flex; align-items:center; gap:5px }
+  .tcard .by i{ width:16px;height:16px;border-radius:50%;font-size:9px;color:#fff;display:flex;align-items:center;justify-content:center }
+  .tcard .used{ font-size:11.5px; font-weight:700; color:var(--mint-d); margin-top:7px }
+
+  /* sponsored / ad */
+  .cand.ad{ border-color:#F5C87A; background:#FFFBF2 }
+  .adbadge{ display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:800;
+    color:#B77400; background:#FFF0CC; padding:3px 8px; border-radius:6px; letter-spacing:.02em }
+  .adhook{ font-size:12.5px; font-weight:700; color:#B77400; margin-top:9px }
+  .addisclosure{ font-size:11.5px; color:#B7B5AE; text-align:center; margin:14px 8px 2px; line-height:1.5 }
+
+  /* revenue model */
+  .rev-hero{ background:var(--ink); color:#fff; border-radius:18px; padding:22px; margin-bottom:14px }
+  .rev-hero .k{ font-size:12px; font-weight:800; color:#FF9B7A; letter-spacing:.06em }
+  .rev-hero h2{ font-size:20px; font-weight:900; margin-top:8px; line-height:1.32 }
+  .rev-stats{ display:flex; gap:10px; margin-bottom:12px }
+  .rev-stat{ flex:1; background:#fff; border:1px solid var(--line); border-radius:14px; padding:15px 14px }
+  .rev-stat b{ font-size:22px; font-weight:900; display:block; color:var(--coral) }
+  .rev-stat span{ font-size:12px; color:var(--muted); display:block; margin-top:3px; line-height:1.35 }
+  .flow-step{ display:flex; gap:12px; padding:13px 0; border-bottom:1px dashed var(--line) }
+  .flow-step:last-child{ border:none }
+  .flow-step .num{ width:26px;height:26px;flex-shrink:0;border-radius:50%;background:var(--coral-bg);
+    color:var(--coral-d); font-weight:900; font-size:13px; display:flex;align-items:center;justify-content:center }
+  .flow-step h4{ font-size:14.5px; font-weight:800 }
+  .flow-step p{ font-size:13px; color:var(--muted); margin-top:2px; line-height:1.5 }
+  .homefoot{ text-align:center; margin-top:26px }
+  .homefoot button{ font-family:inherit; font-size:13px; font-weight:700; color:var(--muted);
+    background:none; border:none; cursor:pointer; text-decoration:underline; text-underline-offset:3px }
+
+  /* meeting: conflict + confirm */
+  .conflict{ background:#FFF6E9; border:1px solid #F3D19A; border-radius:14px; padding:16px; margin-bottom:12px }
+  .conflict h3{ font-size:14px; font-weight:800; color:#B77400; display:flex; align-items:center; gap:6px }
+  .conflict p{ font-size:13px; color:#8A6A2E; margin-top:6px; line-height:1.5 }
+  .conflict .blk{ display:inline-flex; align-items:center; gap:6px; background:#fff; border:1px solid #F0DBB0;
+    border-radius:20px; padding:5px 11px 5px 6px; font-size:13px; font-weight:700; color:#8A6A2E; margin-top:10px }
+  .conflict .blk i{ width:20px;height:20px;border-radius:50%;font-size:10px;color:#fff;display:flex;align-items:center;justify-content:center }
+  .optrow{ display:flex; gap:8px; margin-top:12px }
+  .optbtn{ flex:1; font-family:inherit; font-size:13px; font-weight:700; padding:12px 8px; border-radius:11px;
+    border:1.5px solid #F0DBB0; background:#fff; color:#8A6A2E; cursor:pointer; transition:.14s; line-height:1.3 }
+  .optbtn:active{ transform:scale(.97) }
+  .optbtn.solid{ background:var(--coral); border-color:var(--coral); color:#fff }
+  .attn{ display:flex; flex-wrap:wrap; gap:6px; margin-top:12px }
+  .attn .p{ display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600;
+    padding:5px 11px 5px 5px; border-radius:20px; background:var(--mint-bg); color:var(--mint-d) }
+  .attn .p.out{ background:var(--soft); color:#B7B5AE; text-decoration:line-through }
+  .attn .p i{ width:20px;height:20px;border-radius:50%;font-size:10px;color:#fff;display:flex;align-items:center;justify-content:center }
+  .attn .p.out i{ background:#C9C7C1!important }
+  .confirm-hero{ background:linear-gradient(135deg,#06B981,#0EA5A0); border-radius:18px; padding:22px; color:#fff; margin-bottom:16px }
+  .confirm-hero .chk{ font-size:28px }
+  .confirm-hero h2{ font-size:22px; font-weight:900; margin-top:6px }
+  .confirm-hero p{ font-size:13.5px; opacity:.92; margin-top:4px }
+
+  /* room booking */
+  .room{ border:1.5px solid var(--line); border-radius:14px; padding:15px; margin-bottom:11px;
+    background:#fff; cursor:pointer; transition:.16s }
+  .room:active{ transform:scale(.99) }
+  .room.sel{ border-color:var(--mint); background:var(--mint-bg) }
+  .room.busy{ opacity:.5; cursor:not-allowed }
+  .room .rtop{ display:flex; align-items:flex-start; gap:10px }
+  .room h4{ font-size:15.5px; font-weight:800; display:flex; align-items:center }
+  .room .rec{ font-size:11px; font-weight:800; color:var(--coral-d); background:var(--coral-bg);
+    padding:3px 9px; border-radius:20px; margin-left:8px }
+  .room .cap{ font-size:12.5px; color:var(--muted); margin-top:3px }
+  .room .stat{ flex-shrink:0; font-size:11.5px; font-weight:800; padding:5px 10px; border-radius:20px }
+  .room .stat.ok{ color:var(--mint-d); background:var(--mint-bg) }
+  .room .stat.no{ color:#A32D2D; background:#FCEBEB }
+  .room .equip{ display:flex; flex-wrap:wrap; gap:6px; margin-top:12px }
+  .room .equip span{ font-size:11.5px; font-weight:600; color:#5C5B62; background:var(--soft);
+    padding:4px 10px; border-radius:8px }
+
+  /* propose / each OK */
+  .okrow{ display:flex; align-items:center; justify-content:space-between; padding:11px 0; border-bottom:1px solid var(--line) }
+  .okrow:last-child{ border:none }
+  .okrow .p{ display:inline-flex; align-items:center; gap:9px; font-size:14.5px; font-weight:600 }
+  .okrow .p i{ width:24px;height:24px;border-radius:50%;font-size:11px;color:#fff;display:flex;align-items:center;justify-content:center }
+  .okstat{ font-size:12.5px; font-weight:800; color:#B7B5AE }
+  .okstat.yes{ color:var(--mint-d) }
+
+  /* role-based curation */
+  .rolebar{ display:inline-flex; align-items:center; gap:7px; font-size:12.5px; font-weight:800;
+    padding:6px 12px; border-radius:20px; margin-bottom:16px }
+  .rolebar .dotc{ width:7px;height:7px;border-radius:50% }
+  .rolebar.curator{ background:#EEF2FF; color:#3B4CB8 } .rolebar.curator .dotc{ background:#3B4CB8 }
+  .rolebar.decider{ background:var(--coral-bg); color:var(--coral-d) } .rolebar.decider .dotc{ background:var(--coral) }
+  .selbox{ width:24px;height:24px;flex-shrink:0;border-radius:8px;border:2px solid #D6D4CD;
+    display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff;font-weight:800;transition:.14s }
+  .selbox.on{ background:var(--coral); border-color:var(--coral) }
+  .chip.sm{ font-size:12.5px; padding:7px 12px; border-radius:18px }
+  .tagwrap{ margin-top:12px; padding-top:12px; border-top:1px dashed var(--line) }
+  .taglabel{ font-size:11.5px; font-weight:800; color:var(--muted); margin-bottom:9px }
+  .notetag{ font-size:13px; font-weight:600; color:#3B4CB8; background:#EEF2FF;
+    padding:9px 12px; border-radius:10px; margin-top:10px; line-height:1.4 }
+
+  /* recipient (opened shared link) view */
+  .guesthead{ background:#FEE500; border-radius:16px; padding:16px 17px; margin-bottom:16px }
+  .gh-from{ display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:#3C2F1E }
+  .gh-av{ width:22px;height:22px;border-radius:50%;background:#3C2F1E;color:#FEE500;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center }
+  .gh-title{ font-size:18px; font-weight:900; color:#1A1A1E; margin-top:11px }
+  .gh-meta{ font-size:13px; color:#7A6A38; margin-top:3px; font-weight:600 }
+  .votedbanner{ background:var(--mint-bg); color:var(--mint-d); font-size:13.5px; font-weight:700;
+    padding:12px 14px; border-radius:12px; margin-bottom:14px; line-height:1.45 }
+
+  .toast{ position:fixed; left:50%; bottom:100px; transform:translateX(-50%) translateY(20px);
+    background:var(--ink); color:#fff; font-size:13.5px; font-weight:600; padding:11px 18px; border-radius:24px;
+    opacity:0; pointer-events:none; transition:.28s; z-index:20 }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0) }
+
+  @media(prefers-reduced-motion:reduce){ *{animation:none!important;transition:none!important} }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="bar" id="bar">
+    <button class="back" id="back" onclick="goBack()">←</button>
+    <div class="logo"><span class="mark"><svg viewBox="0 14 128 98" width="34" height="26" aria-hidden="true"><rect x="4" y="20" width="86" height="86" rx="23" fill="#F0513C"/><rect x="15" y="31" width="64" height="64" rx="17" fill="none" stroke="#F7EEE3" stroke-opacity="0.55" stroke-width="4"/><text x="47" y="64" text-anchor="middle" dominant-baseline="central" font-family="Pretendard,sans-serif" font-weight="800" font-size="52" fill="#1A1A1E">갑</text><path d="M111 16 Q111 23 118 23 Q111 23 111 30 Q111 23 104 23 Q111 23 111 16 Z" fill="#FDB022"/><path d="M104 31 Q104 43 116 43 Q104 43 104 55 Q104 43 92 43 Q104 43 104 31 Z" fill="#F0513C"/><path d="M119 52 Q119 58 125 58 Q119 58 119 64 Q119 58 113 58 Q119 58 119 52 Z" fill="#F0513C"/></svg></span><span class="wm">자기</span></div>
+    <div class="steps" id="steps"></div>
+  </div>
+  <div class="scroll" id="scroll"></div>
+  <div class="cta-wrap" id="ctaWrap"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ---------- state ----------
+const S = {
+  screen: 'home',
+  history: [],
+  dinner: { date:null, region:null, people:null, budget:null, food:null, vibe:null, myVote:null, votes:{}, shortlist:[], comments:{}, winnerId:null, decidedBy:null, guestVote:null },
+  meeting: { mine:new Set(), responded:null, guestAv:null, guestPaint:null, exclude:[], room:null, roomId:null, roomBooked:false, prep:new Set(), confirmed:null },
+};
+
+const FRIENDS = [
+  {n:'지민', c:'#FF5A32'}, {n:'현우', c:'#3B82F6'}, {n:'수아', c:'#06B981'},
+  {n:'태호', c:'#8B5CF6'}, {n:'예린', c:'#F59E0B'}
+];
+
+// mock restaurant pool for "10명 · 고기" (담당자가 이 중에서 추림)
+const CANDS = [
+  {id:'c1', emo:'🥩', name:'고기명가 왕십리본점', star:4.6, dist:'320m', price:'3~4만원', pill:'10인 룸 예약 가능'},
+  {id:'c2', emo:'🍖', name:'육전식당 3호점',     star:4.7, dist:'800m', price:'3만원대', pill:'평점 1위'},
+  {id:'c3', emo:'🐷', name:'하남돼지집 성수점',   star:4.3, dist:'1.2km', price:'2만원대', pill:'가성비'},
+  {id:'c4', emo:'🔥', name:'이차돌 성수직영점',   star:4.4, dist:'550m', price:'2만원대', pill:'단체 환영'},
+  {id:'c5', emo:'🍺', name:'몽탄 성수',           star:4.8, dist:'700m', price:'3~4만원', pill:'웨이팅 많음'},
+  {id:'c6', emo:'🥓', name:'정육공간 성수',       star:4.5, dist:'450m', price:'2만원대', pill:'룸 완비'},
+  {id:'c7', emo:'🐮', name:'우가옥 한우',         star:4.6, dist:'950m', price:'4만원+',  pill:'프리미엄'},
+];
+// 담당자가 후보에 붙이는 빠른 코멘트 태그 (탭 방식)
+const COMMENT_TAGS = ['룸 예약 확인','전화로 확인함','가성비 좋음','접근성 좋음','직접 가봄','분위기 굿'];
+
+// region-based sponsored (ad) partners
+const REGIONS = ['성수·왕십리','강남·역삼','홍대·합정','판교·정자'];
+const SPONSORED = {
+  '성수·왕십리':{id:'ad',emo:'🥩',name:'우대갈비 성수직영점',star:4.8,dist:'210m',price:'3만원대',hook:'예약 시 음료 무한리필'},
+  '강남·역삼':  {id:'ad',emo:'🍖',name:'벽제갈비 역삼점',    star:4.7,dist:'340m',price:'4만원+', hook:'10인 룸 확정 예약'},
+  '홍대·합정':  {id:'ad',emo:'🔥',name:'연남토마 본점',      star:4.6,dist:'420m',price:'2만원대',hook:'단체 10% 할인'},
+  '판교·정자':  {id:'ad',emo:'🐷',name:'금돼지식당 판교점',  star:4.7,dist:'180m',price:'3만원대',hook:'주차 2시간 무료'},
+};
+// shared records (진행 내역) — 배경화면 공유하듯 받아서 그대로 사용
+const TEMPLATES = [
+  {emo:'🍖',title:'팀 회식 · 고기 10인',by:'지민',bc:'#FF5A32',used:'1.2천 팀이 사용',kind:'dinner',preset:{region:'성수·왕십리',people:'10명',budget:'3만원대',food:'고기',vibe:'조용한 룸'}},
+  {emo:'📅',title:'주간 팀 회의 · 5인',by:'예린',bc:'#F59E0B',used:'930팀이 사용',kind:'meeting',mpreset:['수-14','수-15','수-16','목-14']},
+  {emo:'🍻',title:'가볍게 한잔 6인',by:'현우',bc:'#3B82F6',used:'840팀이 사용',kind:'dinner',preset:{region:'홍대·합정',people:'6명',budget:'2만원대',food:'아무거나',vibe:'술 위주'}},
+  {emo:'✈️',title:'주말 제주 2박3일',by:'수아',bc:'#06B981',used:'2.4천 팀이 사용',soon:true},
+];
+
+// upcoming date chips (계산 시점 기준, 시간은 제외)
+function dateOptions(){
+  const wd=['일','월','화','수','목','금','토']; const out=[]; const now=new Date();
+  for(let i=0;i<7;i++){ const dt=new Date(now); dt.setDate(now.getDate()+i);
+    out.push(i===0?'오늘':i===1?'내일':`${dt.getMonth()+1}/${dt.getDate()}(${wd[dt.getDay()]})`); }
+  return out;
+}
+
+// meeting rooms for the booking page
+const MEETING_ROOMS = [
+  {id:'A', name:'회의실 A', cap:8,  floor:'3층', equip:['프로젝터','화상','화이트보드'], status:'ok'},
+  {id:'B', name:'회의실 B', cap:4,  floor:'3층', equip:['모니터','화이트보드'], status:'ok'},
+  {id:'C', name:'대회의실',  cap:20, floor:'5층', equip:['프로젝터','화상','마이크'], status:'busy'},
+  {id:'O', name:'온라인 (화상)', cap:99, floor:'-', equip:['Google Meet 링크'], status:'ok'},
+];
+
+// reminder schedule (확정 시 + 사전 리마인드)
+const ALERTS = ['확정 즉시 발송','3일 전 리마인드','당일 아침 9시','시작 2~3시간 전'];
+
+const el = id => document.getElementById(id);
+const scroll = el('scroll'), ctaWrap = el('ctaWrap');
+
+function toast(msg){ const t=el('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),1800); }
+
+// ---------- navigation ----------
+function nav(screen, push=true){ if(push) S.history.push(S.screen); S.screen=screen; render(); scroll.scrollTop=0; }
+function goBack(){ if(S.history.length){ S.screen=S.history.pop(); render(); scroll.scrollTop=0; } }
+
+function setSteps(active){ // active: 0 none,1 선택,2 의논,3 완성
+  const names=['선택','의논','완성'];
+  el('bar').classList.toggle('has-back', S.history.length>0);
+  if(!active){ el('steps').innerHTML=''; return; }
+  el('steps').innerHTML = names.map((n,i)=>{
+    const on=(i+1)<=active?'on':'';
+    return `<span class="${on}">${n}</span>${i<2?`<i class="${(i+1)<active?'on':''}"></i>`:''}`;
+  }).join('');
+}
+
+// ---------- render ----------
+function render(){
+  const R = {
+    home: home, d_setup: d_setup, d_pool: d_pool, d_share: d_share, d_guest: d_guest, d_vote: d_vote,
+    d_result: d_result, d_notice: d_notice, m_setup: m_setup, m_link: m_link, m_guest: m_guest, m_result: m_result,
+    m_confirm: m_confirm, m_propose: m_propose, m_reschedule: m_reschedule, m_room: m_room, m_share: m_share, t_share: t_share, revenue: revenue,
+  };
+  (R[S.screen]||home)();
+}
+
+// ===== HOME =====
+function home(){
+  setSteps(0); S.history=[];
+  scroll.innerHTML = `<div class="screen">
+    <div class="kicker">갑자기 잡힌 일정, 3분 안에 실행 계획으로</div>
+    <h1 class="title">뭐부터<br>정할까요?</h1>
+    <p class="sub">상황만 고르면, 정할 것들을 저희가 물어봐요.<br>링크 공유하고 팀원들이 투표하면 실행 문서가 뚝딱.</p>
+    <div class="mods">
+      ${mod('🍻','갑자기 회식','인원·예산·메뉴 → 식당 투표 → 공지문', "nav('d_setup')")}
+      ${mod('📅','갑자기 회의','참석자 가능 시간 → 최적 시간 + 회의실', "nav('m_setup')")}
+      ${mod('✈️','갑자기 여행','기간·목적 → Day별 일정표','', true)}
+      ${mod('🏢','갑자기 워크샵','장소 투표 + 세션 시간표','', true)}
+    </div>
+
+    <div class="sectlabel"><h2>📥 받아서 바로 쓰는 내역</h2><span>배경화면 공유하듯 탭 한 번</span></div>
+    <div class="tscroll">
+      ${TEMPLATES.map((t,i)=>`<button class="tcard" onclick="applyTemplate(${i})">
+        <div class="temo">${t.emo}</div>
+        <h4>${t.title}</h4>
+        <div class="by"><i style="background:${t.bc}">${t.by[0]}</i>${t.by}님</div>
+        <div class="used">${t.used}${t.soon?' · 곧':''}</div>
+      </button>`).join('')}
+    </div>
+
+    <div class="homefoot"><button onclick="nav('revenue')">💡 갑자기는 어떻게 돈을 벌까요?</button></div>
+  </div>`;
+  ctaWrap.innerHTML='';
+}
+function mod(emo,title,desc,onclick,soon){
+  return `<button class="mod ${soon?'soon':''}" ${soon?'':`onclick="${onclick}"`}>
+    <div class="emo">${emo}</div>
+    <div><h3>${title}</h3><p>${desc}</p></div>
+    <div class="go">›</div></button>`;
+}
+
+// ===== DINNER: SETUP =====
+const OPT = {
+  region:REGIONS,
+  people:['4명','6명','8명','10명','12명+'],
+  budget:['1만원대','2만원대','3만원대','4만원+'],
+  food:['고기','해산물','한식','양식','일식','아무거나'],
+  vibe:['조용한 룸','왁자지껄','술 위주','밥 위주'],
+};
+function d_setup(){
+  setSteps(1);
+  const d=S.dinner;
+  OPT.date = dateOptions();
+  const done=[d.date,d.region,d.people,d.budget,d.food,d.vibe].filter(Boolean).length;
+  const q = done<6 ? `아직 ${6-done}개 남았어요` : '다 골랐어요! 투표 만들까요?';
+  scroll.innerHTML = `<div class="screen">
+    <div class="qline"><span class="dot"></span>${q}</div>
+    <h1 class="title" style="font-size:23px">회식 조건을<br>탭탭탭 골라주세요</h1>
+    ${field('date','날짜')}${field('region','지역 권역')}${field('people','인원')}
+    ${field('budget','예산 (1인)')}${field('food','메뉴')}${field('vibe','분위기')}
+  </div>`;
+  ctaWrap.innerHTML = `<button class="cta" ${done<6?'disabled':''} onclick="dStart()">장소 추천받기</button>`;
+}
+function field(key,label){
+  return `<div class="field"><label>${label}</label><div class="chips">
+    ${OPT[key].map(o=>`<button class="chip ${S.dinner[key]===o?'on':''}" onclick="pick('${key}','${o}')">${o}</button>`).join('')}
+  </div></div>`;
+}
+function pick(key,val){ S.dinner[key]=val; d_setup(); }
+function dStart(){
+  const d=S.dinner;
+  d.votes={}; d.myVote=null; d.shortlist=[]; d.comments={}; d.winnerId=null; d.decidedBy=null; d.guestVote=null;
+  nav('d_pool');
+}
+
+// ===== DINNER: 담당자 후보 추리기 (system pool → shortlist + comments) =====
+function currentSponsored(){ return SPONSORED[S.dinner.region] || SPONSORED['성수·왕십리']; }
+function allCands(){ return [currentSponsored(), ...CANDS]; }
+function candById(id){ return allCands().find(c=>c.id===id); }
+function d_pool(){
+  setSteps(2);
+  const d=S.dinner; const list=allCands(); const sel=d.shortlist;
+  scroll.innerHTML = `<div class="screen">
+    <div class="kicker">STEP 2 · 장소 고르기</div>
+    <h1 class="title" style="font-size:22px">어디로 갈지<br>골라주세요</h1>
+    <p class="sub" style="margin:9px 0 4px">${d.region} · ${d.people} · ${d.food} 조건으로 ${list.length}곳을 찾았어요. <b>한 곳을 고르면 바로 확정</b>, 여러 곳을 고르면 <b>팀 투표</b>에 부쳐요.</p>
+    <div class="livebar"><span>선택 ${sel.length}곳</span><span style="margin-left:auto">탭해서 담기</span></div>
+    ${list.map(c=>{
+      const on=sel.includes(c.id); const ad=c.id==='ad'; const tags=d.comments[c.id]||[];
+      return `<div class="cand ${on?'picked':''} ${ad?'ad':''}">
+        <div class="row1" onclick="dPoolSelect('${c.id}')" style="cursor:pointer">
+          <div class="selbox ${on?'on':''}">${on?'✓':''}</div>
+          <div class="ph">${c.emo}</div>
+          <div style="flex:1;min-width:0">
+            ${ad?'<span class="adbadge">AD · 제휴</span>':''}
+            <h4 style="${ad?'margin-top:6px':''}">${c.name}</h4>
+            <div class="info"><span class="star">★ ${c.star}</span><span>${c.dist}</span><span>${c.price}</span></div>
+          </div>
+        </div>
+        ${ad?`<div class="adhook">🎁 ${c.hook}</div>`:''}
+        ${on?`<div class="tagwrap"><div class="taglabel">메모 남기기 (선택 · 팀 투표 시 함께 보여요)</div><div class="chips">
+          ${COMMENT_TAGS.map(t=>`<button class="chip sm ${tags.includes(t)?'on':''}" onclick="dTag('${c.id}','${t}')">${t}</button>`).join('')}
+        </div></div>`:''}
+      </div>`;
+    }).join('')}
+    <div class="addisclosure">'AD · 제휴' 식당은 ${d.region}권 광고 파트너 (룸·단체 정보 제공)</div>
+  </div>`;
+  let cta;
+  if(sel.length===0) cta = `<button class="cta" disabled>장소를 골라주세요</button>`;
+  else if(sel.length===1) cta = `<button class="cta" onclick="dPickWinner('${sel[0]}')">이 곳으로 확정</button>`;
+  else cta = `<button class="cta mint" onclick="dToVote()">🗳️ 팀 투표 붙이기 (${sel.length}곳)</button>`;
+  ctaWrap.innerHTML = cta;
+}
+function dPoolSelect(id){
+  const d=S.dinner; const i=d.shortlist.indexOf(id);
+  if(i>=0){ d.shortlist.splice(i,1); delete d.comments[id]; }
+  else d.shortlist.push(id);
+  d_pool();
+}
+function dTag(id,tag){
+  const d=S.dinner; const arr=d.comments[id]||(d.comments[id]=[]);
+  const i=arr.indexOf(tag); i>=0?arr.splice(i,1):arr.push(tag);
+  d_pool();
+}
+function dPickWinner(id){ S.dinner.winnerId=id; S.dinner.decidedBy='creator'; nav('d_result'); }
+function dToVote(){ S.dinner.decidedBy='vote'; S.dinner.votes={}; S.dinner.myVote=null; nav('d_share'); }
+
+// ===== DINNER: SHARE (OG preview + link) =====
+function d_share(){
+  setSteps(2);
+  const d=S.dinner;
+  scroll.innerHTML = `<div class="screen">
+    <div class="kicker">팀 투표로 넘겼어요</div>
+    <h1 class="title" style="font-size:23px">단톡방에<br>이렇게 공유돼요</h1>
+    <p class="sub" style="margin-bottom:18px">담당자가 추린 ${d.shortlist.length}곳 중에서 팀원들이 골라요. 카톡 미리보기가 자동으로 떠요 (OG 태그).</p>
+    <div class="og">
+      <div class="img">🍖<div class="tag">🍻 갑자기 회식</div></div>
+      <div class="meta">
+        <h4>${d.food} 먹으러 갈 집, 같이 골라줘!</h4>
+        <p>${d.date} · ${d.region} · ${d.people} · 추천 ${d.shortlist.length}곳</p>
+        <div class="url">gapjagi.app/s/x7Qk2</div>
+      </div>
+    </div>
+    <div class="linkbox">
+      <div class="u">gapjagi.app/s/x7Qk2</div>
+      <button onclick="toast('링크를 복사했어요')">복사</button>
+    </div>
+  </div>`;
+  ctaWrap.innerHTML = `
+    <button class="cta" style="margin-bottom:8px" onclick="nav('d_guest')">📱 팀원이 링크 열면? 미리보기</button>
+    <button class="cta ghost" onclick="nav('d_vote')">주최자 투표 현황 →</button>`;
+}
+
+// ===== DINNER: 팀원이 공유 링크를 열었을 때 (수신자 시점) =====
+function d_guest(){
+  setSteps(2);
+  const d=S.dinner; const list=voteCands();
+  const voted=d.guestVote;
+  const max=Math.max(1,...list.map(c=>(d.votes[c.id]||[]).length));
+  scroll.innerHTML = `<div class="screen">
+    <div class="guesthead">
+      <div class="gh-from"><span class="gh-av">지</span>지민님이 링크를 공유했어요</div>
+      <div class="gh-title">🍻 갑자기 회식 · ${d.date}</div>
+      <div class="gh-meta">${d.region} · ${d.people} · ${d.food}</div>
+    </div>
+    ${voted
+      ? `<div class="votedbanner">✅ 투표 완료! 다른 팀원들도 고르는 중이에요. 확정되면 알림이 가요.</div>`
+      : `<p class="sub" style="margin:2px 0 14px">마음에 드는 곳을 탭해주세요. 담당자 메모도 참고하세요.</p>`}
+    ${list.map(c=>{ const v=d.votes[c.id]||[]; const picked=d.guestVote===c.id; const ad=c.id==='ad'; const tags=d.comments[c.id]||[];
+      return `<div class="cand ${picked?'picked':''} ${ad?'ad':''}" onclick="guestVote('${c.id}')">
+        <div class="fill" style="width:${voted?(v.length/max)*100:0}%"></div>
+        <div class="row1">
+          <div class="ph">${c.emo}</div>
+          <div style="flex:1;min-width:0">
+            ${ad?'<span class="adbadge">AD · 제휴</span>':''}
+            <h4 style="${ad?'margin-top:6px':''}">${c.name}</h4>
+            <div class="info"><span class="star">★ ${c.star}</span><span>${c.dist}</span><span>${c.price}</span></div>
+          </div>
+          ${voted
+            ? `<div class="votes"><b>${v.length}</b><span>표</span></div>`
+            : `<div class="selbox ${picked?'on':''}" style="align-self:center">${picked?'✓':''}</div>`}
+        </div>
+        ${tags.length?`<div class="notetag">💬 ${tags.join(' · ')}</div>`:(ad?`<div class="adhook">🎁 ${c.hook}</div>`:`<span class="pill">${c.pill}</span>`)}
+        ${voted&&v.length?`<div class="avatars">${v.map(f=>`<i style="background:${f.c}">${f.n[0]}</i>`).join('')}</div>`:''}
+      </div>`;
+    }).join('')}
+    <p class="addisclosure">이 화면은 팀원이 카톡 링크를 열었을 때 보는 모습이에요. 로그인 없이 바로 투표해요.</p>
+  </div>`;
+  ctaWrap.innerHTML = voted
+    ? `<button class="cta ghost" style="margin-bottom:8px" onclick="nav('d_vote')">주최자 화면에서 현황 보기 →</button>
+       <button class="cta mint" onclick="toast('투표해줘서 고마워요! 확정되면 알림이 가요 🔔')">투표 완료</button>`
+    : `<button class="cta" disabled>위에서 한 곳을 골라주세요</button>`;
+}
+function guestVote(id){
+  const d=S.dinner; const g='수민';
+  if(d.guestVote && d.votes[d.guestVote]) d.votes[d.guestVote]=d.votes[d.guestVote].filter(f=>f.n!==g);
+  d.guestVote=id; (d.votes[id]=d.votes[id]||[]).push({n:g,c:'#8B5CF6'});
+  d_guest();
+}
+
+// ===== DINNER: VOTE (주최자 집계 화면) =====
+function d_vote(){
+  setSteps(2);
+  const d=S.dinner;
+  const list=voteCands();
+  const hasAd=list.some(c=>c.id==='ad');
+  const total = Object.values(d.votes).reduce((a,b)=>a+b.length,0);
+  const max = Math.max(1,...list.map(c=>(d.votes[c.id]||[]).length));
+  scroll.innerHTML = `<div class="screen">
+    <div class="kicker">STEP 2 · 팀 투표 · 담당자 추천 ${list.length}곳</div>
+    <h1 class="title" style="font-size:22px">어디로 갈까?</h1>
+    <div class="livebar">
+      <span class="live"><span class="d"></span>실시간</span>
+      <span>지금까지 ${total}표</span>
+      <span style="margin-left:auto">${d.myVote?'내 투표 완료':'탭해서 투표'}</span>
+    </div>
+    ${list.map(c=>{
+      const v=d.votes[c.id]||[]; const picked=d.myVote===c.id; const ad=c.id==='ad'; const tags=d.comments[c.id]||[];
+      return `<div class="cand ${picked?'picked':''} ${ad?'ad':''}" onclick="vote('${c.id}')">
+        <div class="fill" style="width:${(v.length/max)*100}%"></div>
+        <div class="row1">
+          <div class="ph">${c.emo}</div>
+          <div style="flex:1;min-width:0">
+            ${ad?'<span class="adbadge">AD · 제휴</span>':''}
+            <h4 style="${ad?'margin-top:6px':''}">${c.name}</h4>
+            <div class="info"><span class="star">★ ${c.star}</span><span>${c.dist}</span><span>${c.price}</span></div>
+          </div>
+          <div class="votes"><b>${v.length}</b><span>표</span></div>
+        </div>
+        ${tags.length?`<div class="notetag">💬 ${tags.join(' · ')}</div>`:(ad?`<div class="adhook">🎁 ${c.hook}</div>`:`<span class="pill">${c.pill}</span>`)}
+        ${v.length?`<div class="avatars">${v.map(f=>`<i style="background:${f.c}">${f.n[0]}</i>`).join('')}</div>`:''}
+      </div>`;
+    }).join('')}
+    ${hasAd?`<div class="addisclosure">'AD · 제휴' 식당은 ${d.region}권 광고 파트너예요. 투표는 팀 자유예요.</div>`:''}
+  </div>`;
+  ctaWrap.innerHTML = `
+    <button class="cta ghost" style="margin-bottom:8px" onclick="simFriends()">👥 팀원들 투표 시뮬레이션</button>
+    <button class="cta mint" ${total<2?'disabled':''} onclick="nav('d_result')">${total<2?'투표를 더 모아주세요':'결과 보기'}</button>`;
+}
+function vote(id){
+  const d=S.dinner;
+  if(d.myVote){ (d.votes[d.myVote]=d.votes[d.myVote].filter(f=>f.n!=='나')); }
+  d.myVote=id; (d.votes[id]=d.votes[id]||[]).push({n:'나',c:'#1A1A1E'});
+  d_vote();
+}
+function simFriends(){
+  const d=S.dinner; let i=0;
+  const pool=[...FRIENDS];
+  const tick=()=>{
+    if(i>=4) return;
+    const f=pool[i];
+    const cc=voteCands(); const c=cc[Math.floor(Math.random()*cc.length)];
+    (d.votes[c.id]=d.votes[c.id]||[]).push(f);
+    i++; d_vote(); toast(`${f.n}님이 투표했어요`);
+    setTimeout(tick,650);
+  };
+  tick();
+}
+
+// ===== DINNER: RESULT =====
+function voteCands(){ return S.dinner.shortlist.map(candById).filter(Boolean); }
+function winnerCand(){
+  const d=S.dinner;
+  if(d.winnerId) return candById(d.winnerId);
+  const list=voteCands().length?voteCands():allCands();
+  return [...list].sort((a,b)=>(d.votes[b.id]||[]).length-(d.votes[a.id]||[]).length)[0];
+}
+function d_result(){
+  setSteps(3);
+  const d=S.dinner, w=winnerCand();
+  const n = parseInt(d.people)||10;
+  const per = {'1만원대':15000,'2만원대':25000,'3만원대':35000,'4만원+':45000}[d.budget]||30000;
+  const total = per*n;
+  const votes=(d.votes[w.id]||[]).length;
+  const byCreator = d.decidedBy==='creator';
+  const decideLine = byCreator ? `${w.emo} 만든 사람이 이 곳으로 정했어요` : `${w.emo} 팀 투표 1위로 결정됐어요`;
+  const decideBadge = byCreator ? `✅ 바로 확정 · ${w.star}★ · ${w.dist}` : `🗳️ ${votes}표 · ${w.star}★ · ${w.dist}`;
+  scroll.innerHTML = `<div class="screen">
+    <div class="winner">
+      <div class="crown">👑</div>
+      <h2>${w.name}</h2>
+      <p>${decideLine}</p>
+      <div class="bar2">${decideBadge}</div>
+    </div>
+    <div class="cardbox"><h3>💰 회비 계산</h3>
+      <div class="kv"><span class="k">예산 (1인)</span><span class="v">${per.toLocaleString()}원</span></div>
+      <div class="kv"><span class="k">인원</span><span class="v">${n}명</span></div>
+      <div class="kv"><span class="k">총 예상</span><span class="v big">${total.toLocaleString()}원</span></div>
+      <div class="kv"><span class="k">1인당 걷을 금액</span><span class="v">${per.toLocaleString()}원</span></div>
+    </div>
+    <div class="cardbox"><h3>📍 예약 정보</h3>
+      <div class="kv"><span class="k">날짜</span><span class="v">${d.date} 저녁</span></div>
+      <div class="kv"><span class="k">상호</span><span class="v">${w.name}</span></div>
+      <div class="kv"><span class="k">가격대</span><span class="v">${w.price}</span></div>
+      <div class="kv"><span class="k">전화</span><span class="v">02-1234-5678</span></div>
+      <a class="maplink" href="https://map.kakao.com/?q=${encodeURIComponent(w.name)}" target="_blank">🗺️ 카카오맵에서 위치 보기</a>
+    </div>
+  </div>`;
+  ctaWrap.innerHTML = `<button class="cta" onclick="nav('d_notice')">공지문 & 체크리스트 만들기</button>`;
+}
+
+// ===== DINNER: NOTICE + CHECKLIST =====
+function d_notice(){
+  setSteps(3);
+  const d=S.dinner, w=winnerCand();
+  const n=parseInt(d.people)||10;
+  const per={'1만원대':15000,'2만원대':25000,'3만원대':35000,'4만원+':45000}[d.budget]||30000;
+  if(!d.alerts) d.alerts=new Set(ALERTS);
+  const text = `[갑자기 회식 안내 🍻]
+
+📍 장소: ${w.name}
+🗓️ 날짜: ${d.date} 저녁
+👥 인원: ${n}명
+💰 회비: 1인 ${per.toLocaleString()}원 (계좌는 단톡방 참고)
+
+${d.food} 먹으러 갑니다! 늦지 말고 와주세요 :)
+위치 → map.kakao.com`;
+  scroll.innerHTML = `<div class="screen">
+    <div class="kicker">STEP 3 · 완성</div>
+    <h1 class="title" style="font-size:22px">공지문이<br>준비됐어요</h1>
+    <p class="sub" style="margin-bottom:14px">실제 서비스에선 이 문구를 LLM이 상황에 맞게 써줘요.</p>
+    <div class="notice" id="noticeText">${text}</div>
+    <div class="linkbox"><div class="u">위 공지문을 단톡방에 붙여넣기</div>
+      <button onclick="copyNotice()">복사</button></div>
+    <div class="cardbox" style="margin-top:16px"><h3>✅ 예약 체크리스트</h3>
+      ${['식당 전화 예약 (10인 룸)','회비 걷을 계좌 공지','불참자 최종 확인','2차 장소 미리 알아두기']
+        .map((t,i)=>`<div class="check" onclick="this.classList.toggle('done')">
+          <div class="box">✓</div><span>${t}</span></div>`).join('')}
+    </div>
+    <div class="cardbox"><h3>🔔 알림 예약</h3>
+      ${ALERTS.map(a=>{const on=d.alerts.has(a);
+        return `<div class="check ${on?'done':''}" onclick="dAlert('${a}')"><div class="box">✓</div><span>${a}</span></div>`;}).join('')}
+    </div>
+  </div>`;
+  ctaWrap.innerHTML = `
+    <button class="cta ghost" style="margin-bottom:8px" onclick="nav('t_share')">📥 이 진행 내역 공유</button>
+    <button class="cta" onclick="nav('home')">🎉 완료! 처음으로</button>`;
+}
+function copyNotice(){
+  const t=el('noticeText').textContent;
+  (navigator.clipboard?.writeText(t)||Promise.reject()).then(()=>toast('공지문을 복사했어요')).catch(()=>toast('공지문을 복사했어요'));
+}
+function dAlert(a){ const s=S.dinner.alerts; s.has(a)?s.delete(a):s.add(a); d_notice(); }
+
+// ===== MEETING: SETUP (When2meet grid) =====
+const DAYS=['월','화','수','목','금'];
+const HOURS=[10,11,12,13,14,15,16,17];
+// attendees with fixed availability (현우 = 반복적으로 안 되는 사람)
+const M_FRIENDS = [
+  {n:'지민', c:'#FF5A32', av:new Set(['화-14','화-15','수-14','수-15','수-16','목-11','목-14'])},
+  {n:'현우', c:'#3B82F6', av:new Set(['월-11','금-16'])},
+  {n:'수아', c:'#06B981', av:new Set(['화-15','수-14','수-15','수-16','목-14','목-15'])},
+  {n:'태호', c:'#8B5CF6', av:new Set(['월-14','화-15','수-15','수-16','수-17','목-14'])},
+];
+let painting=false, paintVal=true;
+function m_setup(){
+  setSteps(1);
+  scroll.innerHTML = `<div class="screen">
+    <div class="qline"><span class="dot"></span>먼저 내 가능한 시간을 칠해주세요</div>
+    <h1 class="title" style="font-size:22px">언제 다들 돼요?</h1>
+    <p class="helper">내가 되는 칸을 탭 또는 드래그. 다음 단계에서 팀원에게 보낼 링크를 만들어요.</p>
+    <div class="grid" id="grid" style="grid-template-columns:36px repeat(${DAYS.length},1fr)">
+      <div class="gcell head"></div>
+      ${DAYS.map(d=>`<div class="gcell head">${d}</div>`).join('')}
+      ${HOURS.map(h=>`
+        <div class="gcell timelabel">${h}시</div>
+        ${DAYS.map(d=>{const key=`${d}-${h}`;return `<div class="gcell" data-k="${key}"></div>`}).join('')}
+      `).join('')}
+    </div>
+  </div>`;
+  ctaWrap.innerHTML = `<button class="cta" onclick="mMakeLink()">회의 링크 만들기</button>`;
+  bindGridFor('grid', S.meeting.mine);
+}
+function mMakeLink(){ S.meeting.responded=new Set(['나']); nav('m_link'); }
+function paintCellSet(cell,set){
+  const k=cell.dataset.k; if(!k) return;
+  if(paintVal){ set.add(k); cell.classList.add('mine'); }
+  else { set.delete(k); cell.classList.remove('mine'); }
+}
+function bindGridFor(gridId, set){
+  const g=el(gridId); if(!g) return;
+  set.forEach(k=>{const c=g.querySelector(`[data-k="${k}"]`); if(c)c.classList.add('mine');});
+  g.querySelectorAll('[data-k]').forEach(cell=>{
+    cell.addEventListener('pointerdown',e=>{ painting=true; paintVal=!set.has(cell.dataset.k); paintCellSet(cell,set); e.preventDefault(); });
+    cell.addEventListener('pointerenter',()=>{ if(painting) paintCellSet(cell,set); });
+  });
+  window.addEventListener('pointerup',()=>painting=false);
+}
+
+// ===== MEETING: 회의 링크 만들기 (공유 + 응답 취합) =====
+function m_link(){
+  setSteps(2);
+  const r=S.meeting.responded; const total=1+M_FRIENDS.length;
+  scroll.innerHTML = `<div class="screen">
+    <div class="kicker">회의 링크가 만들어졌어요</div>
+    <h1 class="title" style="font-size:23px">단톡방에<br>이렇게 공유돼요</h1>
+    <p class="sub" style="margin-bottom:18px">링크를 받은 팀원이 가능한 시간만 칠하면 끝. 카톡 미리보기가 자동으로 떠요 (OG 태그).</p>
+    <div class="og">
+      <div class="img" style="background:linear-gradient(135deg,#3B5BDB,#5B8DEF)">📅<div class="tag">📅 갑자기 회의</div></div>
+      <div class="meta">
+        <h4>다음 주 회의, 언제 돼요?</h4>
+        <p>가능한 시간만 탭하면 끝 · 응답 ${r.size}/${total}명</p>
+        <div class="url">gapjagi.app/m/aQ9v2</div>
+      </div>
+    </div>
+    <div class="linkbox"><div class="u">gapjagi.app/m/aQ9v2</div><button onclick="toast('링크를 복사했어요')">복사</button></div>
+    <div class="livebar" style="margin-top:14px"><span class="live"><span class="d"></span>실시간</span><span>응답 ${r.size}/${total}명</span><span style="margin-left:auto">${r.size>1?[...r].filter(n=>n!=='나').join(', ')+'님 응답함':'아직 나만 응답'}</span></div>
+  </div>`;
+  ctaWrap.innerHTML = `
+    <button class="cta" style="margin-bottom:8px" onclick="nav('m_guest')">📱 팀원이 링크 열면? 미리보기</button>
+    <button class="cta mint" onclick="mCollect()">응답 모으고 확정하기 →</button>`;
+}
+function mCollect(){
+  M_FRIENDS.forEach(f=>S.meeting.responded.add(f.n));
+  toast('팀원 응답을 모두 받았어요');
+  nav('m_result');
+}
+
+// ===== MEETING: 팀원이 링크를 열었을 때 (가능 시간 응답) =====
+function m_guest(){
+  setSteps(2);
+  if(!S.meeting.guestPaint) S.meeting.guestPaint=new Set(S.meeting.guestAv||[]);
+  const submitted=S.meeting.responded.has('지민');
+  scroll.innerHTML = `<div class="screen">
+    <div class="guesthead" style="background:#DCE6FF">
+      <div class="gh-from"><span class="gh-av" style="background:#25366F;color:#DCE6FF">지</span>지민님, 회의 가능 시간을 알려주세요</div>
+      <div class="gh-title" style="color:#1A1A1E">📅 갑자기 회의 · 다음 주</div>
+      <div class="gh-meta" style="color:#4A5A85">가능한 시간만 탭하면 끝이에요</div>
+    </div>
+    ${submitted
+      ? `<div class="votedbanner">✅ 제출 완료! 주최자가 응답을 취합하고 있어요.</div>`
+      : `<p class="helper">가능한 칸을 탭 또는 드래그해서 칠해주세요. 로그인 없이 바로 응답돼요.</p>`}
+    <div class="grid" id="ggrid" style="grid-template-columns:36px repeat(${DAYS.length},1fr)">
+      <div class="gcell head"></div>
+      ${DAYS.map(d=>`<div class="gcell head">${d}</div>`).join('')}
+      ${HOURS.map(h=>`
+        <div class="gcell timelabel">${h}시</div>
+        ${DAYS.map(d=>{const key=`${d}-${h}`;return `<div class="gcell" data-k="${key}"></div>`}).join('')}
+      `).join('')}
+    </div>
+  </div>`;
+  ctaWrap.innerHTML = submitted
+    ? `<button class="cta ghost" onclick="nav('m_link')">← 링크 현황으로 돌아가기</button>`
+    : `<button class="cta mint" onclick="mGuestSubmit()">가능 시간 제출</button>`;
+  if(!submitted) bindGridFor('ggrid', S.meeting.guestPaint);
+  else { const g=el('ggrid'); S.meeting.guestPaint.forEach(k=>{const c=g&&g.querySelector(`[data-k="${k}"]`); if(c)c.classList.add('mine');}); }
+}
+function mGuestSubmit(){
+  S.meeting.guestAv=new Set(S.meeting.guestPaint);
+  S.meeting.responded.add('지민');
+  toast('지민님 가능 시간이 제출됐어요');
+  m_guest();
+}
+// ===== MEETING: RESULT (with conflict resolution) =====
+function m_attendees(){ // 응답한 사람만, 제외 반영
+  const r=S.meeting.responded;
+  const all=[{n:'나',c:'#1A1A1E',av:S.meeting.mine},
+    ...M_FRIENDS.map(f=>(f.n==='지민'&&S.meeting.guestAv)?{...f,av:S.meeting.guestAv}:f)];
+  const base=(r&&r.size)?all.filter(p=>r.has(p.n)):all;
+  return base.filter(p=>!S.meeting.exclude.includes(p.n));
+}
+function m_scores(people){
+  const sc={};
+  HOURS.forEach(h=>DAYS.forEach(d=>{ const k=`${d}-${h}`; sc[k]=people.filter(p=>p.av.has(k)).length; }));
+  return sc;
+}
+function m_result(){
+  setSteps(3);
+  const people = m_attendees();
+  const N = people.length;
+  const scores = m_scores(people);
+  const ranked = Object.entries(scores).sort((a,b)=>b[1]-a[1]);
+  const [bk,bcnt] = ranked[0]; const [bd,bh]=bk.split('-');
+  const maxScore = Math.max(...Object.values(scores),1);
+  // who's missing at the best slot, and who blocks the top-3 slots
+  const top3 = ranked.slice(0,3).map(r=>r[0]);
+  const missingBest = people.filter(p=>!p.av.has(bk));
+  const blocker = people
+    .map(p=>({p, hits:top3.filter(k=>p.av.has(k)).length}))
+    .filter(x=>x.hits===0 && x.p.n!=='나')
+    .sort((a,b)=>a.hits-b.hits)[0]?.p;
+  // is there any slot everyone can do?
+  const allSlot = ranked.find(r=>r[1]===N);
+
+  const attnHtml = people.map(p=>{
+    const ok=p.av.has(bk);
+    return `<span class="p ${ok?'':'out'}"><i style="background:${p.c}">${p.n[0]}</i>${p.n}</span>`;
+  }).join('');
+
+  let conflict='';
+  if(blocker){
+    conflict = `<div class="conflict">
+      <h3>⚠️ 여기서 주최자 공수가 터져요</h3>
+      <p>${blocker.n}님이 가능성 높은 상위 시간대에 계속 안 돼요. 이럴 때 한 명 붙잡고 조율하면 하루가 갑니다.</p>
+      <span class="blk"><i style="background:${blocker.c}">${blocker.n[0]}</i>${blocker.n}님 · 상위 3개 시간 모두 불참</span>
+      <div class="optrow">
+        <button class="optbtn solid" onclick="mExclude('${blocker.n}')">${blocker.n}님 빼고<br>${N-1}명으로 확정</button>
+        <button class="optbtn" onclick="mFindAll()">전원 되는<br>시간 찾기</button>
+      </div>
+    </div>`;
+  } else if(bcnt===N){
+    conflict = `<div class="conflict" style="background:var(--mint-bg);border-color:#BCEBD8">
+      <h3 style="color:var(--mint-d)">🎉 전원 가능한 시간이에요</h3>
+      <p style="color:var(--mint-d)">${N}명 모두 되는 시간을 찾았어요. 바로 확정하세요.</p>
+    </div>`;
+  }
+
+  scroll.innerHTML = `<div class="screen">
+    <div class="best">
+      <h3>👍 가장 많이 겹치는 시간</h3>
+      <div class="big">다음 주 ${bd}요일 ${bh}:00</div>
+      <div class="who">참석 가능 ${bcnt}/${N}명</div>
+      <div class="attn">${attnHtml}</div>
+    </div>
+    ${conflict}
+    <p class="helper">색이 진할수록 많은 사람이 가능해요. ${S.meeting.exclude.length?`(${S.meeting.exclude.join(', ')} 제외됨)`:''}</p>
+    <div class="grid" style="grid-template-columns:36px repeat(${DAYS.length},1fr)">
+      <div class="gcell head"></div>
+      ${DAYS.map(d=>`<div class="gcell head">${d}</div>`).join('')}
+      ${HOURS.map(h=>`
+        <div class="gcell timelabel">${h}시</div>
+        ${DAYS.map(d=>{const k=`${d}-${h}`;const s=scores[k];const op=s/maxScore;const isBest=k===bk;
+          return `<div class="gcell" style="background:${s?`rgba(6,185,129,${0.15+op*0.75})`:'var(--soft)'};color:${op>0.5?'#fff':'#B7B5AE'};${isBest?'outline:2px solid var(--coral);outline-offset:-2px':''}">${s||''}</div>`;
+        }).join('')}
+      `).join('')}
+    </div>
+    <div class="cardbox" style="margin-top:16px"><h3>🤝 어떻게 확정할까요?</h3>
+      <p style="font-size:13.5px;color:var(--muted);line-height:1.65">이 시간을 팀원에게 <b style="color:var(--ink)">제안하고 각자 OK</b>를 받은 뒤 확정하거나, 주최자가 <b style="color:var(--ink)">바로 확정</b>할 수 있어요. 아래에서 골라주세요.</p>
+    </div>
+  </div>`;
+  ctaWrap.innerHTML = `
+    <button class="cta mint" style="margin-bottom:8px" onclick="mPropose('${bk}',${bcnt})">이 시간으로 제안하고 OK 받기</button>
+    <button class="cta ghost" onclick="mConfirm('${bk}',${bcnt})">주최자가 바로 확정</button>`;
+}
+function mExclude(name){
+  if(!S.meeting.exclude.includes(name)) S.meeting.exclude.push(name);
+  const people=m_attendees(); const sc=m_scores(people);
+  const [bk,bcnt]=Object.entries(sc).sort((a,b)=>b[1]-a[1])[0];
+  toast(`${name}님 빼고 ${people.length}명으로 확정`);
+  mConfirm(bk,bcnt);
+}
+function mFindAll(){
+  const people = m_attendees(); const N=people.length;
+  const sc=m_scores(people);
+  const all=Object.entries(sc).find(r=>r[1]===N);
+  if(all){ toast('전원 가능한 시간으로 확정'); mConfirm(all[0],N); }
+  else toast('전원 되는 시간이 없어요 — 불참자 개별 조율이 필요해요');
+}
+function roomLabel(r){ return r?`${r.name}${r.cap<99?` (${r.cap}인)`:''}`:'미선택'; }
+function currentRoom(){ return MEETING_ROOMS.find(r=>r.id===S.meeting.roomId); }
+function mPropose(slot,cnt){
+  S.meeting.proposed={slot,cnt};
+  S.meeting.oks=new Set(['나']);
+  nav('m_propose');
+}
+function m_propose(){
+  setSteps(3);
+  const p=S.meeting.proposed; const [pd,ph]=p.slot.split('-');
+  const people=m_attendees(); const oks=S.meeting.oks;
+  const allok=people.every(x=>oks.has(x.n));
+  scroll.innerHTML = `<div class="screen">
+    <div class="kicker">${p.reason?'일정 변경 · 재확인':'시간 제안 · 각자 OK'}</div>
+    <h1 class="title" style="font-size:22px">${p.reason?'바뀐 시간, 다들<br>괜찮은지 재확인 중':'이 시간, 다들<br>괜찮은지 확인 중'}</h1>
+    ${p.reason?`<div class="conflict" style="background:#FFF6E9;border-color:#F3D19A;margin-top:14px"><h3>🔄 ${p.reason}</h3><p>담당자가 한 명씩 안 돌아다녀도, 전원에게 재확인 요청이 한 번에 나갔어요.</p></div>`:''}
+    <div class="best" style="margin-top:16px">
+      <h3>📨 ${p.reason?'다시 제안한':'제안한'} 시간</h3>
+      <div class="big">다음 주 ${pd}요일 ${ph}:00</div>
+      <div class="who">${oks.size}/${people.length}명 OK</div>
+    </div>
+    <div class="cardbox"><h3>👥 참석자 응답</h3>
+      ${people.map(x=>{const ok=oks.has(x.n); const me=x.n==='나';
+        return `<div class="okrow"><span class="p"><i style="background:${x.c}">${x.n[0]}</i>${x.n}</span>
+          <span class="okstat ${ok?'yes':''}">${me?'제안함':(ok?'✔ OK':'대기중')}</span></div>`;}).join('')}
+    </div>
+    <p class="helper">팀원은 알림을 받고 링크에서 OK만 누르면 돼요. 실시간으로 채워집니다.</p>
+  </div>`;
+  ctaWrap.innerHTML = `
+    ${allok?'':`<button class="cta ghost" style="margin-bottom:8px" onclick="okSim()">👥 팀원 OK 시뮬레이션</button>`}
+    <button class="cta mint" ${allok?'':'disabled'} onclick="mConfirm('${p.slot}',${p.cnt})">${allok?'전원 OK! 이 시간으로 확정 →':'OK를 기다리는 중…'}</button>`;
+}
+function okSim(){
+  const people=m_attendees(); const oks=S.meeting.oks;
+  const pending=people.filter(x=>!oks.has(x.n)); let i=0;
+  const tick=()=>{ if(i>=pending.length) return;
+    const nm=pending[i].n; oks.add(nm); i++; m_propose(); toast(`${nm}님 OK 👍`);
+    setTimeout(tick,600); };
+  tick();
+}
+function mConfirm(slot,cnt){
+  const people=m_attendees();
+  S.meeting.confirmed={slot,cnt,n:people.length};
+  const rec = MEETING_ROOMS.filter(r=>r.status==='ok' && r.cap>=people.length).sort((a,b)=>a.cap-b.cap)[0] || MEETING_ROOMS.find(r=>r.id==='O');
+  S.meeting.roomId=rec.id; S.meeting.roomBooked=false;
+  nav('m_confirm');
+}
+
+// ===== MEETING: CONFIRM → 빠른 후속 진행 (탭탭탭) =====
+const PREP=['노트북 지참','자료 사전 공유','다과 준비','화상 링크','프로젝터 예약'];
+function m_confirm(){
+  setSteps(3);
+  const c=S.meeting.confirmed; const [cd,ch]=c.slot.split('-');
+  const room=currentRoom(); const booked=S.meeting.roomBooked;
+  if(!S.meeting.alerts) S.meeting.alerts=new Set(ALERTS);
+  scroll.innerHTML = `<div class="screen">
+    <div class="confirm-hero">
+      <div class="chk">✅</div>
+      <h2>다음 주 ${cd} ${ch}:00 확정</h2>
+      <p>${c.cnt}/${c.n}명 참석 · 이제 탭탭탭으로 마무리해요</p>
+    </div>
+    <div class="cardbox"><h3>📍 회의실 ${booked?'· 예약 완료':'· 예약 필요'}</h3>
+      <div class="kv"><span class="k">${roomLabel(room)}${room&&room.floor!=='-'?` · ${room.floor}`:''}</span>
+        <span class="v" style="color:${booked?'var(--mint-d)':'var(--coral)'}">${booked?'✔ 예약됨':'미예약'}</span></div>
+      <button class="maplink" style="width:100%;margin-top:12px" onclick="nav('m_room')">회의실 ${booked?'변경':'예약하기'} →</button>
+    </div>
+    <div class="cardbox" style="border-color:#F3D19A;background:#FFFBF2"><h3 style="color:#B77400">🔄 일정 변경</h3>
+      <p style="font-size:13.5px;color:#8A6A2E;line-height:1.55">팀원 한 명이 안 되게 됐어도 일일이 다시 물어볼 필요 없어요. 대체 시간을 찾아 전원에게 한 번에 재확인 요청을 보내요.</p>
+      <button class="maplink" style="width:100%;margin-top:12px;border-color:#F0DBB0;color:#8A6A2E" onclick="nav('m_reschedule')">일정 변경하기 →</button>
+    </div>
+    <div class="field"><label>📋 준비물 · 아젠다 (여러 개 선택)</label><div class="chips">
+      ${PREP.map(p=>`<button class="chip ${S.meeting.prep.has(p)?'on':''}" onclick="mPrep('${p}')">${p}</button>`).join('')}
+    </div></div>
+    <div class="cardbox"><h3>🔔 알림 예약</h3>
+      ${ALERTS.map(a=>{const on=S.meeting.alerts.has(a);
+        return `<div class="check ${on?'done':''}" onclick="mAlert('${a}')"><div class="box">✓</div><span>${a}</span></div>`;}).join('')}
+    </div>
+    <div class="cardbox"><h3>📢 회의 공지</h3>
+      <div class="notice" id="mNotice">${mNoticeText()}</div>
+      <div class="linkbox" style="margin-top:12px"><div class="u">위 공지를 단톡방에 붙여넣기</div>
+        <button onclick="copyMNotice()">복사</button></div>
+    </div>
+  </div>`;
+  ctaWrap.innerHTML = `
+    <button class="cta mint" style="margin-bottom:8px" onclick="${booked?"toast('참석자 캘린더 등록 + 초대 발송 완료 📅')":"nav('m_room')"}">${booked?'캘린더 등록 + 초대 보내기':'회의실 예약하러 가기'}</button>
+    <button class="cta ghost" style="margin-bottom:8px" onclick="nav('m_share')">📥 이 회의 내역 공유</button>
+    <button class="cta" onclick="mReset();nav('home')">완료! 처음으로</button>`;
+}
+function mNoticeText(){
+  const c=S.meeting.confirmed; const [cd,ch]=c.slot.split('-');
+  const prep=[...S.meeting.prep]; const ex=S.meeting.exclude;
+  return `[회의 일정 확정 📅]
+
+🗓️ 일시: 다음 주 ${cd}요일 ${ch}:00~${+ch+1}:00
+📍 장소: ${roomLabel(currentRoom())}${S.meeting.roomBooked?' (예약완료)':''}
+👥 참석: ${c.n}명${ex.length?` (${ex.join(', ')}님은 개별 공유)`:''}
+${prep.length?`📋 준비: ${prep.join(', ')}\n`:''}
+확정됐습니다! 캘린더 초대 보냈어요 :)`;
+}
+// ===== MEETING: 회의실 예약 (별도 페이지) =====
+function m_room(){
+  setSteps(3);
+  const c=S.meeting.confirmed; const [cd,ch]=c.slot.split('-');
+  scroll.innerHTML = `<div class="screen">
+    <div class="kicker">회의실 예약</div>
+    <h1 class="title" style="font-size:22px">어느 방을<br>잡을까요?</h1>
+    <p class="helper">다음 주 ${cd} ${ch}:00~${+ch+1}:00 · ${c.n}명 기준으로 딱 맞는 방을 추천했어요.</p>
+    ${MEETING_ROOMS.map(r=>{
+      const fits = r.cap>=c.n; const busy = r.status==='busy';
+      const disabled = busy || (!fits && r.cap<99);
+      const rec = r.id===S.meeting.roomId && !busy;
+      const sel = r.id===S.meeting.roomId && !disabled;
+      return `<div class="room ${sel?'sel':''} ${disabled?'busy':''}" ${disabled?'':`onclick="pickRoom('${r.id}')"`}>
+        <div class="rtop">
+          <div style="flex:1;min-width:0">
+            <h4>${r.name}${rec?'<span class="rec">추천</span>':''}</h4>
+            <div class="cap">${r.cap<99?`최대 ${r.cap}인`:'인원 제한 없음'}${r.floor!=='-'?` · ${r.floor}`:''}</div>
+          </div>
+          <span class="stat ${busy?'no':'ok'}">${busy?'그 시간 사용중':'예약 가능'}</span>
+        </div>
+        <div class="equip">
+          ${r.equip.map(e=>`<span>${e}</span>`).join('')}
+          ${(!fits && r.cap<99)?'<span style="color:#A32D2D;background:#FCEBEB">인원 초과</span>':''}
+        </div>
+      </div>`;
+    }).join('')}
+    <p class="addisclosure">사내 회의실 예약 시스템과 연동되는 자리예요 (지금은 목업).</p>
+  </div>`;
+  const chosen=currentRoom();
+  ctaWrap.innerHTML = `<button class="cta mint" onclick="reserveRoom()">${roomLabel(chosen)} 예약하기</button>`;
+}
+function pickRoom(id){ S.meeting.roomId=id; m_room(); }
+function reserveRoom(){ S.meeting.roomBooked=true; toast(`${roomLabel(currentRoom())} 예약 완료 📅`); nav('m_confirm'); }
+function mPrep(p){ const s=S.meeting.prep; s.has(p)?s.delete(p):s.add(p); m_confirm(); }
+function mAlert(a){ const s=S.meeting.alerts; s.has(a)?s.delete(a):s.add(a); m_confirm(); }
+function copyMNotice(){ const t=el('mNotice').textContent;
+  (navigator.clipboard?.writeText(t)||Promise.reject()).then(()=>toast('공지를 복사했어요')).catch(()=>toast('공지를 복사했어요')); }
+// ===== MEETING: 일정 변경 (한 명이 안 될 때 → 대체 시간 → 전원 재확인) =====
+function m_reschedule(){
+  setSteps(3);
+  const c=S.meeting.confirmed; const [cd,ch]=c.slot.split('-');
+  const people=m_attendees(); const sc=m_scores(people);
+  const alts=Object.entries(sc).filter(([k])=>k!==c.slot).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  const changer=S.meeting.changer;
+  scroll.innerHTML = `<div class="screen">
+    <div class="kicker">일정 변경</div>
+    <h1 class="title" style="font-size:22px">다른 시간으로<br>다시 잡아볼까요?</h1>
+    <div class="cardbox" style="margin-top:14px"><h3>현재 확정된 일정</h3>
+      <div class="kv"><span class="k">일시</span><span class="v">다음 주 ${cd} ${ch}:00</span></div>
+      <div class="kv"><span class="k">회의실</span><span class="v">${roomLabel(currentRoom())}</span></div>
+    </div>
+    <div class="field"><label>변경이 필요한 팀원 (선택)</label><div class="chips">
+      ${people.filter(p=>p.n!=='나').map(p=>`<button class="chip ${changer===p.n?'on':''}" onclick="mChanger('${p.n}')">${p.n}</button>`).join('')}
+    </div></div>
+    <div class="sectlabel"><h2>🔀 대체 시간</h2><span>탭하면 전원에게 재확인</span></div>
+    ${alts.map(([k,cnt])=>{const [ad,ah]=k.split('-');
+      return `<div class="cand" onclick="mRepropose('${k}',${cnt})">
+        <div class="row1">
+          <div class="ph">📅</div>
+          <div style="flex:1;min-width:0"><h4>다음 주 ${ad}요일 ${ah}:00</h4>
+            <div class="info"><span>참석 가능 ${cnt}/${people.length}명</span></div></div>
+          <div style="color:#C9C7C1;font-size:22px;align-self:center">›</div>
+        </div>
+      </div>`;
+    }).join('')}
+    <p class="addisclosure">시간을 고르면 전원에게 재확인 요청이 <b>한 번에</b> 가요. 담당자가 일일이 돌아다닐 필요 없어요.</p>
+  </div>`;
+  ctaWrap.innerHTML = `<button class="cta ghost" onclick="nav('m_confirm')">취소하고 돌아가기</button>`;
+}
+function mChanger(n){ S.meeting.changer = S.meeting.changer===n?null:n; m_reschedule(); }
+function mRepropose(slot,cnt){
+  S.meeting.proposed={slot,cnt,reason:(S.meeting.changer?`${S.meeting.changer}님 사정으로 시간 변경`:'일정 변경 요청')};
+  S.meeting.oks=new Set(['나']);
+  toast('전원에게 재확인 요청을 보냈어요');
+  nav('m_propose');
+}
+function mReset(){ S.meeting={mine:new Set(),responded:null,guestAv:null,guestPaint:null,exclude:[],room:null,roomId:null,roomBooked:false,prep:new Set(),confirmed:null,proposed:null,oks:null,alerts:null,changer:null}; }
+function m_share(){
+  setSteps(3);
+  const c=S.meeting.confirmed; const [cd,ch]=c.slot.split('-');
+  scroll.innerHTML = `<div class="screen">
+    <div class="kicker">내역 공유</div>
+    <h1 class="title" style="font-size:22px">이 회의 세팅을<br>그대로 공유할까요?</h1>
+    <p class="sub" style="margin-bottom:18px">받은 사람은 조율 과정 없이 시간표만 채우면 끝나요.</p>
+    <div class="tcard" style="width:100%;flex:none">
+      <div class="temo">📅</div>
+      <h4>주간 팀 회의 · ${c.n}인</h4>
+      <div class="by"><i style="background:#1A1A1E">나</i>내가 만든 내역</div>
+      <div class="used">${cd} ${ch}:00 · ${roomLabel(currentRoom())}</div>
+    </div>
+    <div class="linkbox" style="margin-top:16px"><div class="u">gapjagi.app/t/weekly-sync</div>
+      <button onclick="toast('내역 링크를 복사했어요')">복사</button></div>
+  </div>`;
+  ctaWrap.innerHTML = `<button class="cta" onclick="toast('내역을 공유했어요 🎉');setTimeout(()=>{mReset();nav('home')},750)">내역 공유하기</button>`;
+}
+
+// ===== SHARED RECORDS: apply / share =====
+function applyTemplate(i){
+  const t=TEMPLATES[i];
+  if(t.soon){ toast(`${t.emo} ${t.title} 내역은 곧 열려요`); return; }
+  if(t.kind==='meeting'){
+    S.meeting={mine:new Set(t.mpreset),responded:null,guestAv:null,guestPaint:null,exclude:[],room:null,roomId:null,roomBooked:false,prep:new Set(),confirmed:null,proposed:null,oks:null,alerts:null,changer:null};
+    toast(`'${t.title}' 내역을 불러왔어요`);
+    nav('m_result'); return;
+  }
+  S.dinner={...S.dinner, ...t.preset, date:t.preset.date||'내일', myVote:null, votes:{}, shortlist:[], comments:{}, winnerId:null, decidedBy:null, guestVote:null};
+  toast(`'${t.title}' 내역을 불러왔어요`);
+  nav('d_pool');
+}
+function t_share(){
+  setSteps(3);
+  const d=S.dinner;
+  scroll.innerHTML = `<div class="screen">
+    <div class="kicker">내역 공유</div>
+    <h1 class="title" style="font-size:22px">이 진행 내역을<br>그대로 공유할까요?</h1>
+    <p class="sub" style="margin-bottom:18px">받은 사람은 탭 한 번으로 똑같이 시작해요. 배경화면 공유하듯이요.</p>
+    <div class="tcard" style="width:100%;flex:none">
+      <div class="temo">🍖</div>
+      <h4>${d.food} 회식 · ${d.people}</h4>
+      <div class="by"><i style="background:#1A1A1E">나</i>내가 만든 내역</div>
+      <div class="used">${d.region} · ${d.budget} · ${d.vibe}</div>
+    </div>
+    <div class="linkbox" style="margin-top:16px"><div class="u">gapjagi.app/t/myteam-gogi</div>
+      <button onclick="toast('내역 링크를 복사했어요')">복사</button></div>
+  </div>`;
+  ctaWrap.innerHTML = `<button class="cta" onclick="toast('내역을 공유했어요 🎉');setTimeout(()=>nav('home'),750)">내역 공유하기</button>`;
+}
+function revenue(){
+  setSteps(0);
+  scroll.innerHTML = `<div class="screen">
+    <div class="rev-hero">
+      <div class="k">BUSINESS MODEL</div>
+      <h2>권역별 회식장소 추천이<br>그대로 광고 매출이 돼요</h2>
+    </div>
+    <div class="rev-stats">
+      <div class="rev-stat"><b>1,240</b><span>이번 주 성수권<br>회식 투표</span></div>
+      <div class="rev-stat"><b>38%</b><span>제휴 식당<br>예약 전환율</span></div>
+    </div>
+    <div class="cardbox"><h3>어떻게 버나요?</h3>
+      <div class="flow-step"><div class="num">1</div><div><h4>권역별 상단 노출 슬롯</h4><p>식당이 성수·강남 등 자기 권역의 투표 후보 상단 자리를 구매해요.</p></div></div>
+      <div class="flow-step"><div class="num">2</div><div><h4>예약 전환 수수료</h4><p>투표로 정해진 식당이 실제 예약되면 건당 수수료가 발생해요.</p></div></div>
+      <div class="flow-step"><div class="num">3</div><div><h4>지역 수요 데이터</h4><p>'성수권·10인·고기' 같은 실수요를 식당에 리포트로 제공해요.</p></div></div>
+    </div>
+    <p class="addisclosure">제휴 식당은 항상 'AD' 표시로 투명하게 노출돼요.</p>
+  </div>`;
+  ctaWrap.innerHTML = `<button class="cta ghost" onclick="nav('home')">처음으로</button>`;
+}
+
+render();
+</script>
+</body>
+</html>

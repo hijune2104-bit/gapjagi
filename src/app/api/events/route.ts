@@ -1,7 +1,7 @@
 // POST /api/events — 이벤트 + 후보 생성
 import { NextResponse } from "next/server";
 import { createEvent } from "@/features/event/queries";
-import type { CandidateMeta, DinnerConfig } from "@/lib/types";
+import type { CandidateMeta, DinnerConfig, Participant } from "@/lib/types";
 
 export const runtime = "nodejs"; // pg 드라이버는 Node 런타임 필요
 
@@ -9,6 +9,7 @@ interface CreateBody {
   title: string;
   config: DinnerConfig;
   candidates: { name: string; meta?: CandidateMeta }[];
+  participants?: Participant[];
 }
 
 export async function POST(req: Request) {
@@ -32,6 +33,7 @@ export async function POST(req: Request) {
       title: body.title.trim(),
       config: body.config ?? {},
       candidates,
+      participants: body.participants ?? [],
     });
 
     return NextResponse.json({ eventId }, { status: 201 });

@@ -42,6 +42,17 @@ create index if not exists idx_candidates_event on candidates(event_id);
 create index if not exists idx_votes_event on votes(event_id);
 create index if not exists idx_plans_event on plans(event_id);
 
+-- 6) participants: 이벤트 참여자 (생성 시 지정 or 링크로 합류). 조직도 사용자 기준.
+create table if not exists participants (
+  event_id   uuid not null references events(id) on delete cascade,
+  account    text not null,             -- 조직도 account (로그인 아이디)
+  name       text not null,
+  photo      text,                      -- 프로필 사진 URL
+  joined_at  timestamptz not null default now(),
+  primary key (event_id, account)
+);
+create index if not exists idx_participants_event on participants(event_id);
+
 -- 5) members: 조직도 API에서 동기화한 사용자 (이름·아이디만). 간이 로그인에 사용.
 --    아이디(로그인 식별자)는 조직도의 account 값(보통 이메일)을 사용.
 create table if not exists members (

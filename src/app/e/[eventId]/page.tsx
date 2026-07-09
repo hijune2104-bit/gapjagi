@@ -6,7 +6,12 @@ import { useEffect, useState } from "react";
 import { Button, StepBar } from "@/components/ui";
 import Avatar from "@/components/Avatar";
 import { useCurrentUser } from "@/features/auth/useCurrentUser";
-import type { CandidateRow, DinnerConfig, EventRow } from "@/lib/types";
+import type {
+  CandidateRow,
+  DinnerConfig,
+  EventRow,
+  Participant,
+} from "@/lib/types";
 
 export default function VotePage() {
   const { eventId } = useParams<{ eventId: string }>();
@@ -14,6 +19,8 @@ export default function VotePage() {
 
   const [event, setEvent] = useState<EventRow | null>(null);
   const [candidates, setCandidates] = useState<CandidateRow[]>([]);
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [joining, setJoining] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -42,10 +49,37 @@ export default function VotePage() {
       .then((data) => {
         setEvent(data.event);
         setCandidates(data.candidates);
+        setParticipants(data.participants ?? []);
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
   }, [eventId]);
+
+  // 링크로 들어온 로그인 사용자를 참여자로 합류시킴.
+  async function joinEvent() {
+    if (!user?.account) return;
+    setJoining(true);
+    try {
+      const res = await fetch(`/api/events/${eventId}/join`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          account: user.account,
+          name: user.name,
+          photo: user.photo,
+        }),
+      });
+      if (res.ok) {
+        setParticipants((prev) =>
+          prev.some((p) => p.account === user.account)
+            ? prev
+            : [...prev, { account: user.account, name: user.name, photo: user.photo ?? null }]
+        );
+      }
+    } finally {
+      setJoining(false);
+    }
+  }
 
   async function copyLink() {
     const url = `${window.location.origin}/e/${eventId}`;
@@ -112,6 +146,41 @@ export default function VotePage() {
           {copied ? "복사됨!" : "복사"}
         </span>
       </button>
+
+      {/* 참여자 */}
+      <div className="mt-4">
+        <div className="mb-2 flex items-center justify-between px-1">
+          <span className="text-sm font-semibold text-stone-600">
+            참여자 {participants.length}명
+          </span>
+          {user && !participants.some((p) => p.account === user.account) && (
+            <button
+              onClick={joinEvent}
+              disabled={joining}
+              className="rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white active:scale-95 disabled:opacity-50"
+            >
+              {joining ? "참여 중…" : "+ 나도 참여"}
+            </button>
+          )}
+        </div>
+        {participants.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {participants.map((p) => (
+              <span
+                key={p.account}
+                className="flex items-center gap-1.5 rounded-full bg-white py-0.5 pl-0.5 pr-2.5 text-xs text-stone-600 ring-1 ring-stone-200"
+              >
+                <Avatar name={p.name} photo={p.photo} size={20} />
+                {p.name}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="px-1 text-xs text-stone-400">
+            아직 참여자가 없어요. 로그인하면 참여할 수 있어요.
+          </p>
+        )}
+      </div>
 
       {/* 이름 */}
       <div className="mt-6">

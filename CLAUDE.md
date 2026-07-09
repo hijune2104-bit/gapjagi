@@ -27,8 +27,9 @@
 - 지역/📍내 위치 기반 Kakao 식당 추천 (리뷰 링크·지도 포함)
 - 구글 캘린더 등록 + .ics 저장
 - 추천 식당 위치 지도(OpenStreetMap)
-- 조직도 API 연동(이름·아이디 동기화) + 간이 로그인(아이디 입력/선택)
-- 도메인/기능별 폴더 구조(`src/features/*`)
+- 조직도 API 연동(이름·아이디·프로필사진 동기화) + 간이 로그인(아이디 입력)
+- 참여자: 생성 시 조직도에서 지정 + 링크로 "나도 참여" 합류
+- 사용자 보이는 곳 프로필 사진 표시 / 도메인별 폴더 구조(`src/features/*`)
 
 미완 (남은 일):
 - [ ] 팀 문구/시안 반영 (리스킨 — §9 참고)
@@ -96,8 +97,8 @@ OFFICENEXT_CLIENT_SECRET=
 | 단계 | 화면 | 하는 일 |
 |------|------|---------|
 | 랜딩 | `/` | 상황 3종 선택 (회식 활성 / 여행·워크샵 "곧") |
-| 설정 | `/create/dinner` | 인원·예산·분위기·**회식 일시** 선택 → 지역 입력 또는 **📍내 위치** → Kakao 식당 추천(지도·리뷰링크) → 후보 담기 → 링크 발급 |
-| ① 투표지 | `/e/[id]` | 공유링크 복사 + 이름 입력 + 후보 선택 투표 |
+| 설정 | `/create/dinner` | 인원·예산·분위기·**회식 일시**·**참여자(조직도 검색)** 선택 → 지역/📍내 위치 → Kakao 식당 추천(지도·리뷰링크) → 후보 담기 → 링크 발급 |
+| ① 투표지 | `/e/[id]` | 공유링크 복사 + **참여자 목록/나도 참여** + 이름 입력 + 후보 선택 투표 |
 | ② 결과 | `/e/[id]/result` | 2초 폴링 실시간 막대그래프, 1위 강조 |
 | ③ 추천안 | `/e/[id]/plan` | Groq 생성 공지문·회비·타임라인·체크리스트 + 지도 + **구글 캘린더/·ics** |
 | 공유 | `/e/[id]/share` | 읽기 전용 예쁜 HTML (링크복사·공유·인쇄) |
@@ -118,6 +119,7 @@ src/app/                            (라우트)
   e/[eventId]/plan/page.tsx         ③ 추천안 (Groq + 캘린더)
   e/[eventId]/share/page.tsx        공유 HTML (서버 컴포넌트) + ShareBar.tsx
   api/events/...                    이벤트/후보/투표/집계/플랜 (CRUD + Groq)
+  api/events/[id]/join/route.ts     POST 로그인 사용자를 참여자로 합류
   api/places/route.ts               Kakao 식당 검색 (region 또는 x,y 좌표)
   api/org/sync/route.ts             POST 조직도 동기화 (members 저장)
   api/org/members/route.ts          GET 멤버 목록 (비었으면 자동 동기화)
@@ -134,6 +136,7 @@ src/features/                       (도메인 로직)
   plan/calendar.ts                  구글 캘린더 URL + .ics 생성 (클라이언트용)
   org/client.ts                     OfficeNEXT 조직도 API (토큰→조회, 샘플 폴백)
   org/queries.ts                    members 테이블 CRUD (서버 전용)
+  org/MemberPicker.tsx              조직도 멤버 검색·선택 위젯 (참여자 지정, 클라이언트)
   auth/session.ts                   간이 로그인 세션 (localStorage, 클라이언트)
   auth/AuthStatus.tsx               로그인 상태 위젯 (아바타 + 이름님, 클라이언트)
 
@@ -157,6 +160,7 @@ candidates    id · event_id → events · name · meta(jsonb) · created_at
 votes         id · event_id · candidate_id · voter_name(로그인없이 이름만) · created_at
 plans         id · event_id · content(jsonb) · generated_at
 members       account(로그인 아이디=조직도 account) · name · photo(프로필 URL) · synced_at   -- 조직도 동기화, 간이 로그인용
+participants  event_id · account · name · photo · joined_at   -- 이벤트 참여자(생성 시 지정 or 링크 합류), PK(event_id,account)
 ```
 
 **config (DinnerConfig)**: `headcount`(인원) · `budget`(예산대) · `moods[]`(분위기 태그) · `memo` · `scheduledAt`(회식 일시, 캘린더용).

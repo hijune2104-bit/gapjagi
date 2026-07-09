@@ -1,6 +1,10 @@
 // GET /api/events/[id] — 이벤트 + 후보 목록
 import { NextResponse } from "next/server";
-import { getCandidates, getEvent } from "@/features/event/queries";
+import {
+  getCandidates,
+  getEvent,
+  getParticipants,
+} from "@/features/event/queries";
 
 export const runtime = "nodejs";
 
@@ -16,6 +20,9 @@ export async function GET(
       { status: 404 }
     );
   }
-  const candidates = await getCandidates(id);
-  return NextResponse.json({ event, candidates });
+  const [candidates, participants] = await Promise.all([
+    getCandidates(id),
+    getParticipants(id),
+  ]);
+  return NextResponse.json({ event, candidates, participants });
 }

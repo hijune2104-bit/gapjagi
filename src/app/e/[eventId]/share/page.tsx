@@ -2,9 +2,14 @@
 // 저장된 플랜을 DB에서 직접 읽어 예쁜 HTML로 렌더링합니다. 링크로 공유 가능.
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getEvent, getLatestPlan } from "@/features/event/queries";
+import {
+  getEvent,
+  getLatestPlan,
+  getParticipants,
+} from "@/features/event/queries";
 import type { DinnerConfig, PlanContent } from "@/lib/types";
 import MiniMap from "@/components/MiniMap";
+import Avatar from "@/components/Avatar";
 import ShareBar from "./ShareBar";
 
 export const runtime = "nodejs";
@@ -35,6 +40,7 @@ export default async function SharePage({
   if (!event) notFound();
 
   const planRow = await getLatestPlan(eventId);
+  const participants = await getParticipants(eventId);
   const config = event.config as DinnerConfig;
   const schedule = formatSchedule(config.scheduledAt);
 
@@ -186,6 +192,22 @@ export default async function SharePage({
           ))}
         </ul>
       </Block>
+
+      {participants.length > 0 && (
+        <Block title={`👥 참여자 ${participants.length}명`}>
+          <div className="flex flex-wrap gap-2">
+            {participants.map((p) => (
+              <span
+                key={p.account}
+                className="flex items-center gap-1.5 rounded-full bg-stone-50 py-0.5 pl-0.5 pr-2.5 text-sm text-stone-700 ring-1 ring-stone-200"
+              >
+                <Avatar name={p.name} photo={p.photo} size={22} />
+                {p.name}
+              </span>
+            ))}
+          </div>
+        </Block>
+      )}
 
       <footer className="mt-8 text-center text-xs text-stone-400">
         갑자기로 3분 만에 만든 실행계획 ⚡

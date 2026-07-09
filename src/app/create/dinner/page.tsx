@@ -3,11 +3,13 @@
 // 갑자기 회식 - 설정 화면 (탭탭탭 선택지 UX)
 // 인원/예산/분위기를 고르고, 지역을 지정하면 Kakao로 식당을 추천받아 후보로 담습니다.
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button, Chip } from "@/components/ui";
 import StaticMap from "@/components/StaticMap";
-import type { PlaceResult } from "@/lib/types";
+import MemberPicker from "@/features/org/MemberPicker";
+import { useCurrentUser } from "@/features/auth/useCurrentUser";
+import type { Participant, PlaceResult } from "@/lib/types";
 
 const BUDGETS = ["3만원 이하", "3~5만원", "5만원 이상"];
 const MOODS = [
@@ -53,8 +55,21 @@ export default function CreateDinnerPage() {
   const [byLocation, setByLocation] = useState(false); // 내 위치 기반 검색 여부
 
   const [candidates, setCandidates] = useState<CandidateInput[]>([]);
+  const [participants, setParticipants] = useState<Participant[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  // 로그인한 주최자를 참여자에 기본 포함.
+  const { user } = useCurrentUser();
+  useEffect(() => {
+    if (user?.account) {
+      setParticipants((prev) =>
+        prev.some((p) => p.account === user.account)
+          ? prev
+          : [{ account: user.account, name: user.name, photo: user.photo ?? null }, ...prev]
+      );
+    }
+  }, [user]);
 
   function toggleMood(m: string) {
     setMoods((prev) =>
@@ -184,6 +199,7 @@ export default function CreateDinnerPage() {
         body: JSON.stringify({
           title: title.trim() || "갑자기 회식",
           config: { headcount, budget, moods, memo: memo.trim(), scheduledAt },
+          participants,
           candidates: validCandidates.map((c) => ({
             name: c.name.trim(),
             meta: {
@@ -256,6 +272,13 @@ export default function CreateDinnerPage() {
           onChange={(e) => setScheduledAt(e.target.value)}
           className="w-full rounded-xl bg-white px-4 py-3 text-[15px] ring-1 ring-stone-200 outline-none focus:ring-orange-400"
         />
+      </Field>
+
+      <Field label={`참여자 (${participants.length}명) — 조직도에서 추가`}>
+        <MemberPicker value={participants} onChange={setParticipants} />
+        <p className="mt-1.5 px-1 text-xs text-stone-400">
+          여기서 지정하거나, 발급된 링크로 팀원이 직접 참여할 수 있어요.
+        </p>
       </Field>
 
       <Field label="분위기 (여러 개 선택 가능)">

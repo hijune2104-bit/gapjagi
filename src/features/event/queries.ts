@@ -6,17 +6,19 @@ import type {
   DinnerConfig,
   EventRow,
   ModuleType,
+  Participant,
   PlanContent,
   PlanRow,
   TallyItem,
 } from "@/lib/types";
 
-// 이벤트 + 후보들을 한 번에 생성합니다. (설정 화면에서 호출)
+// 이벤트 + 후보 + 참여자를 한 번에 생성합니다. (설정 화면에서 호출)
 export async function createEvent(input: {
   moduleType: ModuleType;
   title: string;
   config: DinnerConfig | Record<string, unknown>;
   candidates: { name: string; meta?: CandidateMeta }[];
+  participants?: Participant[];
 }): Promise<{ eventId: string }> {
   const [event] = await query<EventRow>(
     `insert into events (module_type, title, config)
@@ -33,7 +35,38 @@ export async function createEvent(input: {
     );
   }
 
+  if (input.participants?.length) {
+    await addParticipants(event.id, input.participants);
+  }
+
   return { eventId: event.id };
+}
+
+// 참여자 추가 (생성 시 다수 / 링크 합류 시 1명). 중복 account 는 이름·사진 갱신.
+export async function addParticipants(
+  eventId: string,
+  participants: Participant[]
+): Promise<void> {
+  for (const p of participants) {
+    if (!p.account?.trim()) continue;
+    await query(
+      `insert into participants (event_id, account, name, photo)
+       values ($1, $2, $3, $4)
+       on conflict (event_id, account) do update
+         set name = excluded.name, photo = excluded.photo`,
+      [eventId, p.account.trim(), p.name, p.photo ?? null]
+    );
+  }
+}
+
+export async function getParticipants(
+  eventId: string
+): Promise<Participant[]> {
+  return query<Participant>(
+    `select account, name, photo from participants
+     where event_id = $1 order by joined_at asc`,
+    [eventId]
+  );
 }
 
 export async function getEvent(eventId: string): Promise<EventRow | null> {

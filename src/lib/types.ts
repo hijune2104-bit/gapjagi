@@ -65,6 +65,13 @@ export interface VoteRow {
   created_at: string;
 }
 
+// 이벤트 참여자 (조직도 사용자). 생성 시 지정하거나 링크로 합류.
+export interface Participant {
+  account: string;
+  name: string;
+  photo: string | null;
+}
+
 // 투표자 1명 (이름 + 프로필 사진).
 export interface Voter {
   name: string;
